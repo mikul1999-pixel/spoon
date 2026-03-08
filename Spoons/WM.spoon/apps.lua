@@ -30,6 +30,11 @@ function M:bind(cfg)
     ["app.terminal"] = function() toggleOrCycle(a.terminal) end,
     ["app.editor"]   = function() toggleOrCycle(a.editor) end,
     ["app.browser"]  = function() toggleOrCycle(a.browser) end,
+    ["app.newTab"] = function()
+        local win = hs.window.focusedWindow()
+        if not win then return end
+        hs.eventtap.keyStroke({"cmd"}, "T", win:application())
+    end,
   }
 
   for _, binding in ipairs(b) do

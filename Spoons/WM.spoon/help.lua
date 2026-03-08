@@ -77,7 +77,7 @@ local function createCanvas(bindings)
 
   -- title
   c:appendElements({
-    { type="text", text="Hyper key bindings", textSize=HEAD_SZ+1,
+    { type="text", text="WM hyper key bindings", textSize=HEAD_SZ+1,
       textColor=COLORS.title, textAlignment="center",
       frame={ x=0, y=PAD, w=W, h=ROW_H },
       textFont="Menlo-Bold" },
