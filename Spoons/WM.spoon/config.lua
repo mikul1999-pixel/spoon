@@ -31,10 +31,10 @@ M.delays = {
 -- action strings are handled in their modules
 M.bindings = {
   -- apps
-  { key = "T",      action = "app.terminal",  desc = "Terminal" },
-  { key = "E",      action = "app.editor",    desc = "Editor" },
-  { key = "B",      action = "app.browser",   desc = "Browser" },
-  { key = "return", action = "app.newTab",    desc = "New tab" },
+  { key = "T", action = "app.terminal",  desc = "Terminal" },
+  { key = "E", action = "app.editor",    desc = "Editor" },
+  { key = "B", action = "app.browser",   desc = "Browser" },
+  { key = "=", action = "app.newTab",    desc = "New tab" },
   -- window snapping
   { key = "H", action = "win.snapLeft",      desc = "Snap left" },
   { key = "L", action = "win.snapRight",     desc = "Snap right" },
@@ -54,7 +54,7 @@ M.bindings = {
   { key = "D", action = "layout.dev",        desc = "Dev layout" },
   { key = "M", action = "layout.laptop",     desc = "Laptop layout" },
   -- help
-  { key = "=", action = "help.toggle",       desc = "Help" },
+  { key = "\\", action = "help.toggle",       desc = "Help" },
 }
 
 return M
