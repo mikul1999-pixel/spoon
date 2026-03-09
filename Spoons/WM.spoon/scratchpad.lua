@@ -36,14 +36,13 @@ function M:add()
   if not win then return end
   local winId = win:id()
   for _, s in ipairs(_scratchpads) do
-    -- if s.id == winId then showAlert("Already in scratchpad"); return end
     if s.id == winId then
       local names = {}
       for _, sp in ipairs(_scratchpads) do
         local title = sp.win:title():sub(1, 30):lower()
-        table.insert(names, sp.win:application():name() .. " - " .. title)
+        table.insert(names, sp.win:application():name() .. ": " .. title)
       end
-      showAlert("In Scratchpad:\n • " .. table.concat(names, "\n • "), 1.0)
+      showAlert("In scratchpad \n • " .. table.concat(names, "\n • "), 1.0)
       return
     end
   end
@@ -54,8 +53,8 @@ function M:add()
     screen  = win:screen(),
     watcher = watchWindow(win),
   })
-  win:minimize()
-  showAlert("Added: " .. win:application():name())
+  win:minimize() -- since hide() is app level, need to use minimize
+  showAlert("Added " .. win:application():name() .. " to scratchpad")
 end
 
 function M:toggle()

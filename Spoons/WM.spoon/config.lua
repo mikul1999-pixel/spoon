@@ -1,7 +1,7 @@
 local M = {}
 
 M.hyper = {"ctrl","alt","cmd","shift"}  -- karabiner maps to caps lock
-M.gaps = { inner = 3, outer = 3 }       -- gaps between windows
+M.gaps = { inner = 3, outer = 0 }       -- gaps between windows
 
 M.apps = {
   terminal = "Ghostty",
