@@ -13,6 +13,7 @@ end
 
 -- layout functions for specific screen arrangement
 local function runLayout(layout, cfg)
+  local utils   = dofile(_spoonPath .. "utils.lua")
   local screens = hs.screen.allScreens()
   for _, slot in ipairs(layout) do
     local screenIdx = math.min(slot.screen, #screens)
@@ -23,7 +24,8 @@ local function runLayout(layout, cfg)
       win:moveToScreen(screen)
       hs.timer.doAfter(slot.app == "editor" and cfg.delays.vscode or cfg.delays.moveResize, function()
         local f = screen:frame()
-        win:setFrame({ x=f.x+f.w*slot.x, y=f.y+f.h*slot.y, w=f.w*slot.w, h=f.h*slot.h })
+        local raw = { x=f.x+f.w*slot.x, y=f.y+f.h*slot.y, w=f.w*slot.w, h=f.h*slot.h }
+        win:setFrame(utils.applyGaps(raw, f, cfg.gaps))
       end)
     end
   end
