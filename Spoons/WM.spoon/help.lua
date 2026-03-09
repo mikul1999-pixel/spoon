@@ -24,8 +24,8 @@ local COLORS = {
 }
 
 -- group bindings by action prefix for section headers
-local SECTION_ORDER = { "app", "win", "layout", "help" }
-local SECTION_LABELS = { app="Apps", win="Window", layout="Layouts", help="Help" }
+local SECTION_ORDER = { "app", "win", "layout", "scratchpad","help" }
+local SECTION_LABELS = { app="Apps", win="Window", layout="Layouts", scratchpad="Scratchpad", help="Help" }
 
 local function groupBindings(bindings)
   local groups = {}

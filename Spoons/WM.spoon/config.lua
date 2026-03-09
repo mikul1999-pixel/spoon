@@ -34,7 +34,7 @@ M.bindings = {
   { key = "T", action = "app.terminal",  desc = "Terminal" },
   { key = "E", action = "app.editor",    desc = "Editor" },
   { key = "B", action = "app.browser",   desc = "Browser" },
-  { key = "=", action = "app.newTab",    desc = "New tab" },
+  { key = "return", action = "app.newTab",    desc = "New tab" },
   -- window snapping
   { key = "H", action = "win.snapLeft",      desc = "Snap left" },
   { key = "L", action = "win.snapRight",     desc = "Snap right" },
@@ -53,6 +53,9 @@ M.bindings = {
   -- layouts
   { key = "D", action = "layout.dev",        desc = "Dev layout" },
   { key = "M", action = "layout.laptop",     desc = "Laptop layout" },
+  -- scratchpad
+  { key = "[", action = "scratchpad.add",    desc = "Add to scratchpad" },
+  { key = "]", action = "scratchpad.toggle", desc = "Toggle scratchpad" },
   -- help
   { key = "\\", action = "help.toggle",       desc = "Help" },
 }

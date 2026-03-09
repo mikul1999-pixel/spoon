@@ -19,12 +19,13 @@ local function req(name)
 end
 
 function WM:init()
-  self.config  = req("config")
-  self.utils   = req("utils")
-  self.apps    = req("apps")
-  self.window  = req("window")
-  self.layouts = req("layouts")
-  self.help    = req("help")
+  self.config     = req("config")
+  self.utils      = req("utils")
+  self.apps       = req("apps")
+  self.window     = req("window")
+  self.layouts    = req("layouts")
+  self.scratchpad = req("scratchpad")
+  self.help       = req("help")
 end
 
 function WM:start()
@@ -41,6 +42,7 @@ function WM:start()
   self.apps:bind(cfg)
   self.window:bind(cfg)
   self.layouts:bind(cfg)
+  self.scratchpad:bind(cfg)
   self.help:bind(cfg)
 
   hs.alert.show("WM loaded")
