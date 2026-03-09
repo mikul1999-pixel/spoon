@@ -6,7 +6,7 @@ Personal macOS automation config
 
 ### WM - Window Manager
 
-Keyboard window management. Requires [Karabiner-Elements](https://karabiner-elements.pqrs.org/) to map caps lock -> hyper (`ctrl+alt+cmd+shift`).
+Keyboard-driven window management. Requires [Karabiner-Elements](https://karabiner-elements.pqrs.org/) to map caps lock -> hyper (`ctrl+alt+cmd+shift`).
 
 All bindings and layouts are configured in `Spoons/WM.spoon/config.lua`.
 
@@ -17,7 +17,7 @@ All bindings and layouts are configured in `Spoons/WM.spoon/config.lua`.
 | hyper+T    | Terminal         |
 | hyper+E    | Editor           |
 | hyper+B    | Browser          |
-| hyper+=    | New tab          |
+| hyper+RETURN | New tab        |
 | hyper+H    | Snap left        |
 | hyper+L    | Snap right       |
 | hyper+K    | Snap top         |
@@ -25,6 +25,7 @@ All bindings and layouts are configured in `Spoons/WM.spoon/config.lua`.
 | hyper+F    | Fullscreen       |
 | hyper+C    | Center           |
 | hyper+Z    | Undo move        |
+| hyper+G    | Snap to balanced grid|
 | hyper+N    | Next monitor     |
 | hyper+P    | Prev monitor     |
 | hyper+tab  | Focus next screen|
@@ -32,4 +33,6 @@ All bindings and layouts are configured in `Spoons/WM.spoon/config.lua`.
 | hyper+R    | Resize mode      |
 | hyper+D    | Dev layout       |
 | hyper+M    | Laptop layout    |
+| hyper+[    | Add to scratchpad|
+| hyper+]    | Toggle scratchpad|
 | hyper+\    | Help             |
