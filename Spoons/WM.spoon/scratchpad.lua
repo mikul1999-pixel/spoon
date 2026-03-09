@@ -6,8 +6,8 @@ function M:init(p) _spoonPath = p end
 local _scratchpads = {}  -- { id, win, frame, screen, watcher }
 local _lastIndex   = 0
 
-local function showAlert(msg)
-  hs.alert.show(msg, { textSize = 12 }, 0.5)
+local function showAlert(msg, duration)
+  hs.alert.show(msg, { textSize = 16 }, duration or 0.5)
 end
 
 local function removeById(winId)
@@ -36,7 +36,16 @@ function M:add()
   if not win then return end
   local winId = win:id()
   for _, s in ipairs(_scratchpads) do
-    if s.id == winId then showAlert("Already in scratchpad"); return end
+    -- if s.id == winId then showAlert("Already in scratchpad"); return end
+    if s.id == winId then
+      local names = {}
+      for _, sp in ipairs(_scratchpads) do
+        local title = sp.win:title():sub(1, 30):lower()
+        table.insert(names, sp.win:application():name() .. " - " .. title)
+      end
+      showAlert("In Scratchpad:\n • " .. table.concat(names, "\n • "), 1.0)
+      return
+    end
   end
   table.insert(_scratchpads, {
     id      = winId,
