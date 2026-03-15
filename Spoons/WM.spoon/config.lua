@@ -1,7 +1,48 @@
 local M = {}
 
+-- Core config options
 M.hyper = {"ctrl","alt","cmd","shift"}  -- karabiner maps to caps lock
 M.gaps = { inner = 3, outer = 0 }       -- gaps between windows
+
+M.yabai = {
+  path = "/opt/homebrew/bin/yabai",
+}
+
+M.workspaces = {
+  backend = "yabai",
+  count = 9,
+  sendFollow = false,
+  enableDirectSend = false,
+  debug = false,
+}
+
+M.behavior = {
+  balanceAfterDirectionalMove = false,
+  directionalFallback = true,
+  autoFloatForGeometry = true,
+  autoFloatOnMoveFailure = false,
+  autoFloatOnDisplayMoveFailure = false,
+  preferYabaiDisplayMove = true,
+  followDisplayOnMove = true,
+  retryCount = 2,
+  placementHorizontalRatio = 0.5,
+  placementVerticalBandRatio = 0.5,
+  placementEdgeWarpPasses = 6,
+}
+
+M.debug = {
+  enabled = false,
+  level = "info",
+  maxEntries = 300,
+}
+
+M.scratchpad = {
+  useWorkspaceTransport = true,
+  workspace = 9,
+  retrieveTarget = "current",
+  followOnRetrieve = false,
+  fallbackMinimize = true,
+}
 
 M.apps = {
   terminal = "Ghostty",
@@ -38,9 +79,9 @@ M.bindings = {
   { key = "return", action = "app.newTab",    desc = "New tab" },
   -- window snapping
   { key = "H", action = "win.snapLeft",      desc = "Snap left" },
-  { key = "L", action = "win.snapRight",     desc = "Snap right" },
-  { key = "K", action = "win.snapTop",       desc = "Snap top" },
   { key = "J", action = "win.snapBottom",    desc = "Snap bottom" },
+  { key = "K", action = "win.snapTop",       desc = "Snap top" },
+  { key = "L", action = "win.snapRight",     desc = "Snap right" },
   { key = "F", action = "win.maximize",      desc = "Fullscreen" },
   { key = "C", action = "win.center",        desc = "Center" },
   { key = "Z", action = "win.undo",          desc = "Undo move" },
@@ -51,7 +92,12 @@ M.bindings = {
   { key = "tab", action = "win.nextScreen",  desc = "Focus next screen" },
   { key = "`",   action = "win.cycleLocal",  desc = "Cycle windows" },
   -- modes
-  { key = "R", action = "win.resizeMode",    desc = "Resize mode" }, -- exited through esc
+  { key = "R", action = "win.resizeMode",    desc = "Resize mode" },
+  { key = "W", action = "workspace.mode",    desc = "Workspace mode" },
+  { key = "S", action = "workspace.sendMode", desc = "Workspace send mode" },
+  { key = "A", action = "workspace.focusMode", desc = "Focus mode" },
+  { key = "V", action = "workspace.swapMode", desc = "Swap mode" },
+  { key = "space", action = "workspace.toggleFloat", desc = "Toggle float" },
   -- layouts
   { key = "D", action = "layout.dev",        desc = "Dev layout" },
   { key = "M", action = "layout.laptop",     desc = "Laptop layout" },
@@ -61,5 +107,21 @@ M.bindings = {
   -- help
   { key = "\\", action = "help.toggle",      desc = "Help" },
 }
+
+for i = 1, M.workspaces.count do
+  table.insert(M.bindings, {
+    key = tostring(i),
+    action = "workspace.focus." .. i,
+    desc = "Workspace " .. i,
+  })
+
+  if M.workspaces.enableDirectSend then
+    table.insert(M.bindings, {
+      key = tostring(i),
+      action = "workspace.send." .. i,
+      desc = "Send to workspace " .. i,
+    })
+  end
+end
 
 return M

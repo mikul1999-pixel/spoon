@@ -1,0 +1,221 @@
+local M = {}
+
+-- Scratchpad manager to store / fetch windows
+local _spoonPath
+local _bind
+local _alerts
+local _cfg
+local _state
+local _backend
+local _logger
+
+function M:init(p)
+  _spoonPath = p
+  _bind = dofile(_spoonPath .. "utils/bind.lua")
+  _alerts = dofile(_spoonPath .. "ui/alerts.lua")
+end
+
+local _scratchpads = {}
+local _lastIndex = 0
+
+local function defaults()
+  return {
+    useWorkspaceTransport = true,
+    workspace = 9,
+    retrieveTarget = "current",
+    followOnRetrieve = false,
+    fallbackMinimize = true,
+  }
+end
+
+local function mergedConfig(cfg)
+  local tableUtil = dofile(_spoonPath .. "utils/table.lua")
+  return tableUtil.merge(defaults(), cfg or {})
+end
+
+local function getWin(entry)
+  if entry.win and entry.win:id() then return entry.win end
+  return hs.window.get(entry.id)
+end
+
+local function removeById(winId)
+  for i, s in ipairs(_scratchpads) do
+    if s.id == winId then
+      if s.watcher then s.watcher:stop() end
+      table.remove(_scratchpads, i)
+      _state:removeScratchOrigin(winId)
+      if _lastIndex >= i then _lastIndex = math.max(0, _lastIndex - 1) end
+      return
+    end
+  end
+end
+
+local function watchWindow(win)
+  local watcher = win:newWatcher(function(_, event, _, id)
+    if event == hs.uielement.watcher.elementDestroyed then
+      removeById(id)
+    end
+  end, win:id())
+  watcher:start({ hs.uielement.watcher.elementDestroyed })
+  return watcher
+end
+
+local function scratchWorkspace()
+  return _cfg.workspace or 9
+end
+
+local function currentWorkspace()
+  return _backend:focusedWorkspace() or _state:currentWorkspace() or 1
+end
+
+local function workspaceHidden(entry)
+  local ws = _backend:windowWorkspace(entry.id)
+  return ws == scratchWorkspace()
+end
+
+local function toWorkspace(entry, workspaceId, opts)
+  -- Sends scratchpad window via backend; falls back to minimize when needed.
+  local ok = _backend:sendWindowToWorkspace(entry.id, workspaceId, opts or {})
+  if ok then return true end
+
+  local win = getWin(entry)
+  if win and _cfg.fallbackMinimize then
+    win:minimize()
+    entry.mode = "minimize"
+    if _logger then
+      _logger:info("scratchpad.fallback", "transport failed, minimized window", {
+        winId = entry.id,
+        workspace = workspaceId,
+      })
+    end
+  end
+  return false
+end
+
+function M:add()
+  local win = hs.window.focusedWindow()
+  if not win then return end
+
+  local winId = win:id()
+  for _, s in ipairs(_scratchpads) do
+    if s.id == winId then
+      _alerts.warn("Already in scratchpad")
+      return
+    end
+  end
+
+  local originWorkspace = currentWorkspace()
+  local entry = {
+    id = winId,
+    win = win,
+    frame = win:frame(),
+    screen = win:screen(),
+    watcher = watchWindow(win),
+    mode = "workspace",
+  }
+
+  _state:setScratchOrigin(winId, originWorkspace)
+
+  if _cfg.useWorkspaceTransport then
+    local ok = toWorkspace(entry, scratchWorkspace(), { sendFollow = false })
+    if not ok then entry.mode = "minimize" end
+  else
+    entry.mode = "minimize"
+    win:minimize()
+  end
+
+  table.insert(_scratchpads, entry)
+  _alerts.show("Added " .. (win:application() and win:application():name() or "window") .. " to scratchpad")
+end
+
+function M:toggle()
+  -- Cycles scratchpad windows between hidden and visible states.
+  if #_scratchpads == 0 then _alerts.warn("No scratchpads"); return end
+
+  local function isHidden(entry)
+    local win = getWin(entry)
+    if not win then return false end
+    if entry.mode == "workspace" then return workspaceHidden(entry) end
+    return win:isMinimized()
+  end
+
+  local function hide(entry)
+    local win = getWin(entry)
+    if not win then return end
+    if entry.mode == "workspace" then
+      toWorkspace(entry, scratchWorkspace(), { sendFollow = false })
+    else
+      win:minimize()
+    end
+  end
+
+  local function show(entry)
+    local win = getWin(entry)
+    if not win then return end
+
+    if entry.mode == "workspace" then
+      local target = currentWorkspace()
+      if _cfg.retrieveTarget == "origin" then
+        target = _state:scratchOrigin(entry.id) or entry.originWorkspace or target
+      end
+      toWorkspace(entry, target, { sendFollow = _cfg.followOnRetrieve })
+    else
+      win:unminimize()
+    end
+
+    local isFloating = _backend:isFloating(entry.id)
+    if isFloating == true then
+      win:moveToScreen(entry.screen)
+      win:setFrame(entry.frame)
+      win:setFullScreen(false)
+    end
+    win:focus()
+  end
+
+  if _lastIndex > 0 and _lastIndex <= #_scratchpads then
+    local s = _scratchpads[_lastIndex]
+    if not isHidden(s) then
+      hide(s)
+      return
+    end
+  end
+
+  local start = (_lastIndex % #_scratchpads) + 1
+  for offset = 0, #_scratchpads - 1 do
+    local i = (start + offset - 1) % #_scratchpads + 1
+    local s = _scratchpads[i]
+    if isHidden(s) then
+      _lastIndex = i
+      show(s)
+      return
+    end
+  end
+
+  _alerts.warn("No scratchpads hidden")
+end
+
+function M:bind(cfg, commands, state, backend, logger)
+  _cfg = mergedConfig(cfg.scratchpad)
+  _state = state
+  _backend = backend
+  _logger = logger
+
+  local actions = {
+    ["scratchpad.add"] = function() self:add() end,
+    ["scratchpad.toggle"] = function() self:toggle() end,
+  }
+
+  for action, fn in pairs(actions) do
+    commands:register(action, fn, { category = "scratchpad" })
+  end
+
+  for _, binding in ipairs(cfg.bindings) do
+    if actions[binding.action] then
+      _bind.bind(binding.mods or cfg.hyper, binding.key, function()
+        commands:execute(binding.action)
+      end)
+    end
+  end
+end
+
+return M
