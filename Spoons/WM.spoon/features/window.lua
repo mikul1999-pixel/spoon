@@ -8,6 +8,7 @@ local _alerts
 local _backend
 local _cfg
 local _logger
+local _modes
 
 function M:init(p)
   _spoonPath = p
@@ -206,55 +207,77 @@ local function balanceWindows(gaps)
 end
 
 local resizeStep = 40
-local resizeMode = hs.hotkey.modal.new()
 
-function resizeMode:entered() _alerts.show("Resize mode: h/j/k/l") end
-function resizeMode:exited() _alerts.show("Exit resize") end
-
-local function addResizeBinds()
-  -- Resize mode applies tiled resize first, then falls back to floating frame resize.
-  local function r(dir, dx, dy, dw, dh)
-    local win = hs.window.focusedWindow()
-    if not win then return end
-
-    if not isFloating(win) then
-      local ok, err = _backend:resizeWindow(win:id(), dir, resizeStep)
-      if ok then return end
-
-      if ensureFloating(win, "resizeFallback") then
-        info("window.resize", "fallback to floating resize", {
-          direction = dir,
-          error = err,
-        })
-      else
-        _alerts.warn(err or "Failed to resize tiled window")
-        return
-      end
-    end
-
-    if not isFloating(win) then
-      return
-    end
-
-    saveUndo(win)
-    local f = win:frame()
-    win:setFrame({ x = f.x + dx, y = f.y + dy, w = f.w + dw, h = f.h + dh })
-  end
-  resizeMode:bind("", "h", function() r("left", 0, 0, -resizeStep, 0) end)
-  resizeMode:bind("", "l", function() r("right", 0, 0, resizeStep, 0) end)
-  resizeMode:bind("", "k", function() r("up", 0, 0, 0, -resizeStep) end)
-  resizeMode:bind("", "j", function() r("down", 0, 0, 0, resizeStep) end)
-  resizeMode:bind("", "escape", function() resizeMode:exit() end)
+local function resizeVector(dir)
+  local vectors = {
+    left = { dx = 0, dy = 0, dw = -resizeStep, dh = 0 },
+    right = { dx = 0, dy = 0, dw = resizeStep, dh = 0 },
+    up = { dx = 0, dy = 0, dw = 0, dh = -resizeStep },
+    down = { dx = 0, dy = 0, dw = 0, dh = resizeStep },
+  }
+  return vectors[dir]
 end
 
-function M:bind(cfg, commands, backend, logger)
+local function resizeDirection(dir)
+  -- Resize intent: try tiled backend first, then float and apply frame resize.
+  local win = hs.window.focusedWindow()
+  if not win then return end
+
+  local vector = resizeVector(dir)
+  if not vector then return end
+
+  if not isFloating(win) then
+    local ok, err = _backend:resizeWindow(win:id(), dir, resizeStep)
+    if ok then return end
+
+    if ensureFloating(win, "resizeFallback") then
+      info("window.resize", "fallback to floating resize", {
+        direction = dir,
+        error = err,
+      })
+    else
+      _alerts.warn(err or "Failed to resize tiled window")
+      return
+    end
+  end
+
+  if not isFloating(win) then return end
+
+  saveUndo(win)
+  local f = win:frame()
+  win:setFrame({
+    x = f.x + vector.dx,
+    y = f.y + vector.dy,
+    w = f.w + vector.dw,
+    h = f.h + vector.dh,
+  })
+end
+
+local function ensureResizeMode(commands)
+  if not _modes then return end
+
+  _modes:register("resize", {
+    enterMessage = "Resize mode: h/j/k/l",
+    exitMessage = "Exit resize",
+    onDirection = function(dir)
+      commands:execute("win.resize." .. dir)
+    end,
+  })
+end
+
+function M:bind(cfg, commands, backend, logger, modes)
   _cfg = cfg
   _backend = backend
   _logger = logger
+  _modes = modes
   local gaps = cfg.gaps
-  addResizeBinds()
+  ensureResizeMode(commands)
 
   local actions = {
+    ["win.move.left"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "left", gaps) end,
+    ["win.move.right"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "right", gaps) end,
+    ["win.move.up"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "up", gaps) end,
+    ["win.move.down"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "down", gaps) end,
     ["win.snapLeft"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "left", gaps) end,
     ["win.snapRight"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "right", gaps) end,
     ["win.snapTop"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "up", gaps) end,
@@ -301,7 +324,13 @@ function M:bind(cfg, commands, backend, logger)
     end,
     ["win.nextScreen"] = focusNextScreen,
     ["win.cycleLocal"] = cycleWindowsOnScreen,
-    ["win.resizeMode"] = function() resizeMode:enter() end,
+    ["win.resize.left"] = function() resizeDirection("left") end,
+    ["win.resize.right"] = function() resizeDirection("right") end,
+    ["win.resize.up"] = function() resizeDirection("up") end,
+    ["win.resize.down"] = function() resizeDirection("down") end,
+    ["win.resizeMode"] = function()
+      if _modes then _modes:enter("resize") end
+    end,
   }
 
   for action, fn in pairs(actions) do
