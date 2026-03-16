@@ -31,7 +31,8 @@ function WM:init()
   self.workspaces = req("features/workspaces")
   self.layouts    = req("features/layouts")
   self.scratchpad = req("features/scratchpad")
-  self.help       = req("features/help")
+  self.help       = req("ui/help")
+  self.statusbar  = req("ui/statusbar")
 end
 
 function WM:start()
@@ -70,6 +71,11 @@ function WM:start()
     print(self.state:dump())
   end, { category = "wm" })
 
+  self.commands:register("ui.statusbar.toggle", function()
+    local visible = self.statusbar:toggle()
+    hs.alert.show("Status bar " .. (visible and "shown" or "hidden"))
+  end, { category = "ui" })
+
   -- auto reload on .lua changes
   self._watcher = hs.pathwatcher.new(hs.configdir .. "/", function(files)
     for _, f in pairs(files) do
@@ -84,12 +90,21 @@ function WM:start()
   self.layouts:bind(cfg, self.commands)
   self.scratchpad:bind(cfg, self.commands, self.state, self.backend, self.logger)
   self.help:bind(cfg, self.commands)
+  if not cfg.ui or not cfg.ui.statusbar or cfg.ui.statusbar.enabled ~= false then
+    self.statusbar:start({
+      config = cfg,
+      state = self.state,
+      logger = self.logger,
+    })
+  end
 
   self.logger:info("wm.start", "WM started", { backend = self.backend:name() })
   hs.alert.show("WM loaded")
 end
 
 function WM:stop()
+  if self.help and self.help.stop then self.help:stop() end
+  if self.statusbar and self.statusbar.stop then self.statusbar:stop() end
   if self._watcher then self._watcher:stop() end
   hs.hotkey.deleteAll()
 end

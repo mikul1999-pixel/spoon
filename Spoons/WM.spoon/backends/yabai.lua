@@ -183,6 +183,15 @@ function M:init(ctx)
   _logger = ctx.logger
   _policy = ctx.policy
 
+  local ui = ctx.config and ctx.config.ui and ctx.config.ui.statusbar or {}
+  local reserve = ui.reserveTopPadding ~= false
+  local topInset = tonumber(ui.topInset) or 0
+  if reserve and topInset > 0 then
+    msg({ "config", "external_bar", "all:" .. tostring(math.floor(topInset)) .. ":0" })
+  else
+    msg({ "config", "external_bar", "all:0:0" })
+  end
+
   if _policy and _policy.newWindowDefaults then
     local newWindow = _policy:newWindowDefaults()
     local placement = nil

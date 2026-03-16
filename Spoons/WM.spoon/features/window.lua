@@ -21,6 +21,22 @@ end
 
 local _undoFrames = {}
 
+local function effectiveScreenFrame(screen)
+  local f = screen:frame()
+  local ui = _cfg and _cfg.ui and _cfg.ui.statusbar or {}
+  if ui.reserveTopPadding == false then return f end
+
+  local inset = tonumber(ui.topInset) or 0
+  if inset <= 0 then return f end
+
+  return {
+    x = f.x,
+    y = f.y + inset,
+    w = f.w,
+    h = math.max(80, f.h - inset),
+  }
+end
+
 local function saveUndo(win)
   if win then _undoFrames[win:id()] = win:frame() end
 end
@@ -100,10 +116,11 @@ local function moveTiledOrSnap(win, dir, gaps)
   if not win then return end
 
   if isFloating(win) then
-    if dir == "left" then snap(win, 0, 0, 0.5, 1, gaps, win:screen():frame()) end
-    if dir == "right" then snap(win, 0.5, 0, 0.5, 1, gaps, win:screen():frame()) end
-    if dir == "up" then snap(win, 0, 0, 1, 0.5, gaps, win:screen():frame()) end
-    if dir == "down" then snap(win, 0, 0.5, 1, 0.5, gaps, win:screen():frame()) end
+    local sf = effectiveScreenFrame(win:screen())
+    if dir == "left" then snap(win, 0, 0, 0.5, 1, gaps, sf) end
+    if dir == "right" then snap(win, 0.5, 0, 0.5, 1, gaps, sf) end
+    if dir == "up" then snap(win, 0, 0, 1, 0.5, gaps, sf) end
+    if dir == "down" then snap(win, 0, 0.5, 1, 0.5, gaps, sf) end
     return
   end
 
@@ -114,10 +131,11 @@ local function moveTiledOrSnap(win, dir, gaps)
         direction = dir,
         error = err,
       })
-      if dir == "left" then snap(win, 0, 0, 0.5, 1, gaps, win:screen():frame()) end
-      if dir == "right" then snap(win, 0.5, 0, 0.5, 1, gaps, win:screen():frame()) end
-      if dir == "up" then snap(win, 0, 0, 1, 0.5, gaps, win:screen():frame()) end
-      if dir == "down" then snap(win, 0, 0.5, 1, 0.5, gaps, win:screen():frame()) end
+      local sf = effectiveScreenFrame(win:screen())
+      if dir == "left" then snap(win, 0, 0, 0.5, 1, gaps, sf) end
+      if dir == "right" then snap(win, 0.5, 0, 0.5, 1, gaps, sf) end
+      if dir == "up" then snap(win, 0, 0, 1, 0.5, gaps, sf) end
+      if dir == "down" then snap(win, 0, 0.5, 1, 0.5, gaps, sf) end
       return
     end
 
@@ -145,7 +163,7 @@ local function moveAcrossDisplay(direction)
 
   local wasFloating = isFloating(win)
   local beforeScreen = win:screen()
-  local beforeScreenFrame = beforeScreen and beforeScreen:frame() or nil
+  local beforeScreenFrame = beforeScreen and effectiveScreenFrame(beforeScreen) or nil
   local beforeFrame = win:frame()
 
   local function clamp(v, min, max)
@@ -239,7 +257,7 @@ local function moveAcrossDisplay(direction)
   local target = targetScreenForFallback()
   if target then
     if not beforeScreenFrame then return false end
-    local tf = target:frame()
+    local tf = effectiveScreenFrame(target)
 
     local offsetX = beforeFrame.x - beforeScreenFrame.x
     local offsetY = beforeFrame.y - beforeScreenFrame.y
@@ -347,7 +365,7 @@ local function balanceWindows(gaps)
   local focused = hs.window.focusedWindow()
   if not focused then return end
   local screen = focused:screen()
-  local f = screen:frame()
+  local f = effectiveScreenFrame(screen)
   local wins = hs.fnutils.filter(hs.window.orderedWindows(), function(w)
     return w:screen() == screen and w:isVisible() and not w:isMinimized()
   end)
@@ -454,7 +472,7 @@ function M:bind(cfg, commands, backend, logger, modes, policy)
       local win = hs.window.focusedWindow()
       if not win then return end
       if isFloating(win) then
-        snap(win, 0, 0, 1, 1, gaps, win:screen():frame())
+        snap(win, 0, 0, 1, 1, gaps, effectiveScreenFrame(win:screen()))
       else
         local ok, err = _backend:toggleFullscreen(win:id())
         if not ok then _alerts.warn(err or "Failed to toggle fullscreen") end
@@ -464,7 +482,7 @@ function M:bind(cfg, commands, backend, logger, modes, policy)
       local win = hs.window.focusedWindow()
       if not win then return end
       if isFloating(win) or ensureFloating(win, "center") then
-        snap(win, 0.1, 0.1, 0.8, 0.8, gaps, win:screen():frame())
+        snap(win, 0.1, 0.1, 0.8, 0.8, gaps, effectiveScreenFrame(win:screen()))
       else
         workspaceBalance()
       end

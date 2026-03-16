@@ -16,6 +16,17 @@ M.workspaces = {
   debug = false,
 }
 
+M.ui = {
+  statusbar = {
+    enabled = true,
+    dynamicSpaces = true,
+    pollInterval = 0.35,
+    spacesRefreshInterval = 1.5,
+    topInset = 34,
+    reserveTopPadding = true,
+  },
+}
+
 M.behavior = {
   balanceAfterDirectionalMove = false,
   directionalFallback = true,
