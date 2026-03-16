@@ -171,13 +171,13 @@ local function ensureModes(commands, actions, count)
   end
 
   _modes:register("workspace", {
-    enterMessage = "Workspace mode: send 1-9, send h/l, focus [ ]",
+    enterMessage = "Workspace mode: 1-9, H/L, [ ]",
     exitMessage = "Exit workspace mode",
     bindings = workspaceBindings,
   })
 
   _modes:register("focus", {
-    enterMessage = "Focus mode: h/j/k/l",
+    enterMessage = "Focus mode: H/J/K/L",
     exitMessage = "Exit focus mode",
     onDirection = function(dir)
       commands:execute("workspace.focus." .. dir)
@@ -185,7 +185,7 @@ local function ensureModes(commands, actions, count)
   })
 
   _modes:register("swap", {
-    enterMessage = "Swap mode: h/j/k/l",
+    enterMessage = "Swap mode: H/J/K/L",
     exitMessage = "Exit swap mode",
     onDirection = function(dir)
       commands:execute("workspace.swap." .. dir)
@@ -260,6 +260,8 @@ function M:bind(cfg, commands, state, backend, logger, modes, policy)
       local ok, err = backend:sendWindowToWorkspace(winId, prev, { sendFollow = sendFollow })
       if not ok then
         _alerts.warn(err or "Failed to send window to previous workspace")
+      else
+        _alerts.show("Sent -> ws " .. prev)
       end
     end,
     ["workspace.send.next"] = function()
@@ -275,6 +277,8 @@ function M:bind(cfg, commands, state, backend, logger, modes, policy)
       local ok, err = backend:sendWindowToWorkspace(winId, nxt, { sendFollow = sendFollow })
       if not ok then
         _alerts.warn(err or "Failed to send window to next workspace")
+      else
+        _alerts.show("Sent -> ws " .. nxt)
       end
     end,
   }
@@ -299,7 +303,11 @@ function M:bind(cfg, commands, state, backend, logger, modes, policy)
         return
       end
       local ok, err = backend:sendWindowToWorkspace(winId, i, { sendFollow = sendFollow })
-      if not ok then _alerts.warn(err or ("Failed to send window to workspace " .. i)) end
+      if not ok then
+        _alerts.warn(err or ("Failed to send window to workspace " .. i))
+      else
+        _alerts.show("Sent -> ws " .. i)
+      end
     end
   end
 

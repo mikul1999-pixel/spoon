@@ -98,6 +98,8 @@ function WM:start()
     })
   end
 
+  dofile(self.spoonPath .. "ui/alerts.lua"):setStatusbar(self.statusbar, cfg)
+
   self.logger:info("wm.start", "WM started", { backend = self.backend:name() })
   hs.alert.show("WM loaded")
 end

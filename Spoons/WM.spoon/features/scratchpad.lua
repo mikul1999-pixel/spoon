@@ -100,6 +100,12 @@ local function raiseAndFocus(win)
   win:focus()
 end
 
+local function appNameFor(entry)
+  local win = getWin(entry)
+  local app = win and win:application()
+  return (app and app:name()) or "window"
+end
+
 local function toWorkspace(entry, workspaceId, opts)
   -- Sends scratchpad window via backend; falls back to minimize when needed.
   local ok = _backend:sendWindowToWorkspace(entry.id, workspaceId, opts or {})
@@ -126,7 +132,7 @@ function M:add()
   local winId = win:id()
   for _, s in ipairs(_scratchpads) do
     if s.id == winId then
-      _alerts.warn("Already in scratchpad")
+      _alerts.show("Already in scratchpad", 0.95)
       return
     end
   end
@@ -175,6 +181,7 @@ function M:toggle()
     else
       win:minimize()
     end
+    _alerts.show("SP hide: " .. appNameFor(entry))
   end
 
   local function show(entry)
@@ -203,6 +210,7 @@ function M:toggle()
       win:setFullScreen(false)
     end
     raiseAndFocus(win)
+    _alerts.show(string.format("SP show %d/%d", getLastIndex(), #_scratchpads))
   end
 
   local currentIndex = getLastIndex()

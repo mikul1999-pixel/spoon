@@ -25,6 +25,13 @@ M.ui = {
     topInset = 34,
     tiledTopPadding = 6,
     reserveTopPadding = true,
+    toast = {
+      enabled = true,
+      ttl = 1.2,
+      maxChars = 34,
+      dedupeWindow = 0.5,
+      routeInfoAlerts = true,
+    },
   },
 }
 

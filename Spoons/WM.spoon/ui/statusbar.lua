@@ -12,6 +12,15 @@ local _canvasSafe
 local _visible = true
 local _workspaceCount = 9
 local _lastSpacesQueryAt = 0
+local _toastCanvas
+local _toastTimer
+local _toast = {
+  msg = nil,
+  kind = "info",
+  expiresAt = 0,
+  lastMsg = nil,
+  lastAt = 0,
+}
 
 local _last = {
   workspace = nil,
@@ -37,6 +46,24 @@ local STYLE = {
   inactiveTabBg  = { red = 0, green = 0, blue = 0, alpha = 0  },
   activeTabBg    = { red = 0, green = 0, blue = 0, alpha = 0  },
   modeText       = { red=0.12, green=0.12, blue=0.18, alpha=1 },
+}
+
+local TOAST_STYLE = {
+  info = {
+    bg     = { red=0.106, green=0.118, blue=0.188, alpha=0.88 },
+    border = { red=0.431, green=0.561, blue=0.749, alpha=1 },
+    text   = { red=0.639, green=0.722, blue=0.847, alpha=1 },
+  },
+  warn = {
+    bg     = { red=0.149, green=0.118, blue=0.055, alpha=0.90 },
+    border = { red=0.769, green=0.659, blue=0.353, alpha=1 },
+    text   = { red=0.831, green=0.722, blue=0.478, alpha=1 },
+  },
+  error = {
+    bg     = { red=0.173, green=0.071, blue=0.094, alpha=0.90 },
+    border = { red=0.710, green=0.376, blue=0.439, alpha=1 },
+    text   = { red=0.769, green=0.490, blue=0.541, alpha=1 },
+  },
 }
 
 local MODE_COLORS = {
@@ -77,6 +104,120 @@ local function now()
     return hs.timer.secondsSinceEpoch()
   end
   return os.time()
+end
+
+local function toastConfig()
+  local ui = (_cfg and _cfg.ui and _cfg.ui.statusbar) or {}
+  local toast = ui.toast or {}
+  return {
+    enabled = toast.enabled ~= false,
+    ttl = tonumber(toast.ttl) or 1.2,
+    maxChars = math.max(8, tonumber(toast.maxChars) or 34),
+    dedupeWindow = math.max(0, tonumber(toast.dedupeWindow) or 0.5),
+  }
+end
+
+local function activeToastText()
+  local cfg = toastConfig()
+  if not cfg.enabled then return nil end
+  if not _toast.msg or _toast.msg == "" then return nil end
+  if now() >= (_toast.expiresAt or 0) then
+    _toast.msg = nil
+    return nil
+  end
+  return _toast.msg
+end
+
+local function toastTextSize(msg)
+  local ok, sz = pcall(hs.drawing.getTextDrawingSize, tostring(msg or ""), {
+    font = "Menlo",
+    size = 11,
+  })
+  if ok and sz and sz.w and sz.h then
+    return sz
+  end
+  return { w = math.max(80, #tostring(msg or "") * 6), h = 16 }
+end
+
+local function destroyToastCanvas()
+  if _toastTimer then
+    _toastTimer:stop()
+    _toastTimer = nil
+  end
+  if _toastCanvas then
+    _toastCanvas:hide()
+    _toastCanvas:delete()
+    _toastCanvas = nil
+  end
+end
+
+local function renderToast()
+  if not _visible or not _canvas then
+    destroyToastCanvas()
+    return
+  end
+
+  local msg = activeToastText()
+  if not msg then
+    destroyToastCanvas()
+    return
+  end
+
+  local kind = _toast.kind or "info"
+  local palette = TOAST_STYLE[kind] or TOAST_STYLE.info
+  local bar = _canvas:frame()
+  local sz = toastTextSize(msg)
+  local padX, padY = 10, 6
+  local w = math.min(300, math.max(120, sz.w + padX * 2))
+  local h = 24
+  local frame = {
+    x = bar.x + bar.w + 8,
+    y = bar.y + math.floor((bar.h - h) / 2),
+    w = w,
+    h = h,
+  }
+
+  if not _toastCanvas then
+    _toastCanvas = hs.canvas.new(frame)
+    _toastCanvas:level(hs.canvas.windowLevels.status)
+    _toastCanvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
+  else
+    _toastCanvas:frame(frame)
+  end
+
+  _canvasSafe.replace(_toastCanvas, {
+    {
+      type = "rectangle",
+      action = "fill",
+      fillColor = palette.bg,
+      roundedRectRadii = { xRadius = 4, yRadius = 4 },
+    },
+    {
+      type = "rectangle",
+      action = "stroke",
+      strokeColor = palette.border,
+      strokeWidth = 1.3,
+      roundedRectRadii = { xRadius = 4, yRadius = 4 },
+    },
+    {
+      type = "text",
+      text = msg,
+      textFont = "Menlo",
+      textSize = 11,
+      textColor = TOAST_STYLE.text,
+      textAlignment = "center",
+      frame = { x = padX, y = padY + 1, w = w - padX * 2, h = h - padY * 2 },
+    },
+  }, "statusbar.toast")
+
+  _toastCanvas:show()
+
+  if _toastTimer then _toastTimer:stop() end
+  local remaining = (_toast.expiresAt or 0) - now()
+  _toastTimer = hs.timer.doAfter(math.max(0.05, remaining), function()
+    _toast.msg = nil
+    destroyToastCanvas()
+  end)
 end
 
 local function shouldQuerySpaces()
@@ -219,6 +360,7 @@ local function reconcileAndRender(force)
     and _last.mode == mode
     and _last.screenId == screenId
     and _last.workspaceCount == _workspaceCount then
+    renderToast()
     return
   end
 
@@ -227,6 +369,7 @@ local function reconcileAndRender(force)
   _last.screenId = screenId
   _last.workspaceCount = _workspaceCount
   render(workspace, mode)
+  renderToast()
 end
 
 function M:start(ctx)
@@ -235,6 +378,12 @@ function M:start(ctx)
   _logger = ctx and ctx.logger or _logger
   _visible = true
   _workspaceCount = (_cfg and _cfg.workspaces and _cfg.workspaces.count) or 9
+  _toast.msg = nil
+  _toast.kind = "info"
+  _toast.expiresAt = 0
+  _toast.lastMsg = nil
+  _toast.lastAt = 0
+  destroyToastCanvas()
 
   reconcileAndRender(true)
 
@@ -251,19 +400,48 @@ function M:refresh()
   reconcileAndRender(true)
 end
 
+function M:notify(msg, opts)
+  local cfg = toastConfig()
+  if not cfg.enabled then return false end
+  msg = tostring(msg or "")
+  msg = msg:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  if msg == "" then return false end
+
+  if #msg > cfg.maxChars then
+    msg = msg:sub(1, math.max(1, cfg.maxChars - 1)) .. "..."
+  end
+
+  local t = now()
+  if _toast.lastMsg == msg and (t - (_toast.lastAt or 0)) < cfg.dedupeWindow then
+    return true
+  end
+
+  local ttl = (opts and tonumber(opts.ttl)) or cfg.ttl
+  _toast.msg = msg
+  _toast.kind = (opts and opts.kind) or "info"
+  _toast.expiresAt = t + math.max(0.2, ttl)
+  _toast.lastMsg = msg
+  _toast.lastAt = t
+  renderToast()
+  return true
+end
+
 function M:toggle()
   _visible = not _visible
   if _visible then
     reconcileAndRender(true)
     if _canvas then _canvas:show() end
+    renderToast()
   else
     if _canvas then _canvas:hide() end
+    if _toastCanvas then _toastCanvas:hide() end
   end
   return _visible
 end
 
 function M:stop()
   if _timer then _timer:stop(); _timer = nil end
+  destroyToastCanvas()
   if _canvas then _canvas:hide(); _canvas:delete(); _canvas = nil end
 end
 

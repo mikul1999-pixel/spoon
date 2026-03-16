@@ -4,9 +4,23 @@ local M = {}
 local _queue = {}
 local _showing = false
 local _canvas = nil
+local _lastEnqueue = { msg = nil, kind = nil, at = 0 }
 local _selfPath = debug.getinfo(1, "S").source:sub(2)
 local _basePath = _selfPath:match("^(.*[/\\])")
 local _canvasSafe = dofile(_basePath .. "canvas.lua")
+local _shared = _G.__WM_ALERTS_SHARED or {}
+_G.__WM_ALERTS_SHARED = _shared
+
+local function toastConfig()
+  local cfg = _shared.config or {}
+  local ui = cfg.ui and cfg.ui.statusbar or {}
+  local toast = ui.toast or {}
+  return {
+    enabled = toast.enabled ~= false,
+    routeInfo = toast.routeInfoAlerts ~= false,
+    ttl = tonumber(toast.ttl) or 1.2,
+  }
+end
 
 local PALETTE = {
   info = {
@@ -35,6 +49,13 @@ local function textSize(msg)
     return sz
   end
   return { w = math.max(120, #tostring(msg) * 7), h = 20 }
+end
+
+local function now()
+  if hs and hs.timer and hs.timer.secondsSinceEpoch then
+    return hs.timer.secondsSinceEpoch()
+  end
+  return os.time()
 end
 
 local function destroyCanvas()
@@ -110,8 +131,17 @@ local function showNext()
 end
 
 local function enqueue(msg, duration, kind)
+  local text = tostring(msg or "")
+  local t = now()
+  if _lastEnqueue.msg == text and _lastEnqueue.kind == kind and (t - (_lastEnqueue.at or 0)) < 0.45 then
+    return
+  end
+  _lastEnqueue.msg = text
+  _lastEnqueue.kind = kind
+  _lastEnqueue.at = t
+
   table.insert(_queue, {
-    msg = msg,
+    msg = text,
     duration = duration,
     kind = kind,
   })
@@ -119,6 +149,13 @@ local function enqueue(msg, duration, kind)
 end
 
 function M.show(msg, duration)
+  local cfg = toastConfig()
+  local statusbar = _shared.statusbar
+  if cfg.enabled and cfg.routeInfo and statusbar and statusbar.notify then
+    local ok = statusbar:notify(msg, { ttl = duration or cfg.ttl, kind = "info" })
+    if ok then return end
+  end
+
   enqueue(msg, duration or 0.85, "info")
 end
 
@@ -128,6 +165,11 @@ end
 
 function M.error(msg)
   enqueue(msg, 1.4, "error")
+end
+
+function M:setStatusbar(statusbar, config)
+  _shared.statusbar = statusbar
+  if config then _shared.config = config end
 end
 
 return M
