@@ -50,6 +50,10 @@ local function defaults()
     displayMove = {
       preferYabai = true,
       followDisplay = true,
+      wrap = true,
+      failureMode = "strict",
+      tiledBehavior = "retile",
+      floatingBehavior = "preserve_frame",
     },
     newWindow = {
       mode = "tile",
@@ -63,6 +67,23 @@ end
 local function normalizeMode(mode)
   if mode == "strict" or mode == "smart" then return mode end
   return nil
+end
+
+local function normalizeDisplayFailureMode(mode)
+  if mode == "strict" or mode == "smart" then return mode end
+  return "strict"
+end
+
+local function normalizeFloatingBehavior(mode)
+  if mode == "preserve_relative_frame" or mode == "preserve_frame" then
+    return mode
+  end
+  return "preserve_frame"
+end
+
+local function normalizeTiledBehavior(mode)
+  if mode == "retile" then return mode end
+  return "retile"
 end
 
 local function emit(level, event, message, data)
@@ -122,6 +143,10 @@ function M:configure(cfg, logger)
     displayMove = {
       preferYabai = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.preferYabai, legacy.displayMove.preferYabai),
       followDisplay = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.followDisplay, legacy.displayMove.followDisplay),
+      wrap = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.wrap, nil),
+      failureMode = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.failureMode, nil),
+      tiledBehavior = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.tiledBehavior, nil),
+      floatingBehavior = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.floatingBehavior, nil),
     },
     newWindow = {
       mode = sourceFrom(customDefaults.newWindow and customDefaults.newWindow.mode, nil),
@@ -153,6 +178,11 @@ function M:configure(cfg, logger)
     _policy.newWindow.focus = true
   end
 
+  _policy.displayMove.failureMode = normalizeDisplayFailureMode(_policy.displayMove.failureMode)
+  _policy.displayMove.tiledBehavior = normalizeTiledBehavior(_policy.displayMove.tiledBehavior)
+  _policy.displayMove.floatingBehavior = normalizeFloatingBehavior(_policy.displayMove.floatingBehavior)
+  if _policy.displayMove.wrap == nil then _policy.displayMove.wrap = true end
+
   if type(_policy.appRules) ~= "table" then
     _policy.appRules = {}
   end
@@ -182,6 +212,10 @@ function M:displayMove(context)
   emit("trace", "policy.displayMove", "resolved display move policy", {
     preferYabai = value.preferYabai,
     followDisplay = value.followDisplay,
+    wrap = value.wrap,
+    failureMode = value.failureMode,
+    tiledBehavior = value.tiledBehavior,
+    floatingBehavior = value.floatingBehavior,
     source = _sources.displayMove,
     context = context,
   })

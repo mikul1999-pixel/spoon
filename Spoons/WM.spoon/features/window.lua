@@ -139,39 +139,138 @@ local function moveTiledOrSnap(win, dir, gaps)
 end
 
 local function moveAcrossDisplay(direction)
-  -- Cross monitor move. yabai path with floating fallback
+  -- Cross monitor move: tiled via yabai, floating via Hammerspoon geometry.
   local win = hs.window.focusedWindow()
   if not win then return end
+
+  local wasFloating = isFloating(win)
+  local beforeScreen = win:screen()
+  local beforeScreenFrame = beforeScreen and beforeScreen:frame() or nil
+  local beforeFrame = win:frame()
+
+  local function clamp(v, min, max)
+    if v < min then return min end
+    if v > max then return max end
+    return v
+  end
 
   local displayPolicy = _policy and _policy.displayMove and _policy:displayMove({
     component = "window",
     direction = direction,
+    floating = wasFloating,
   }) or {}
+
   local useYabai = displayPolicy.preferYabai ~= false
+  local allowWrap = displayPolicy.wrap ~= false
+  local strictFailure = displayPolicy.failureMode ~= "smart"
   local displaySel = direction == "next" and "next" or "prev"
 
-  if useYabai then
-    local ok, err = _backend:moveWindowToDisplay(win:id(), displaySel, {
-      follow = displayPolicy.followDisplay == true,
-    })
-    if ok then return end
+  local function targetScreenForFallback()
+    local current = win:screen()
+    if not current then return nil end
 
-    if ensureFloating(win, "displayMoveFailure") then
-      info("window.displayMove", "fallback to floating display move", {
-        direction = direction,
-        error = err,
-      })
-    else
-      _alerts.warn(err or "Failed to move window to display")
-      return
+    local screens = hs.screen.allScreens()
+    table.sort(screens, function(a, b)
+      local af = a:fullFrame()
+      local bf = b:fullFrame()
+      if af.x == bf.x then return af.y < bf.y end
+      return af.x < bf.x
+    end)
+
+    if #screens == 0 then return nil end
+    local pos = nil
+    for i, s in ipairs(screens) do
+      if s:id() == current:id() then
+        pos = i
+        break
+      end
     end
+    if not pos then return nil end
+
+    if direction == "next" then
+      if not allowWrap and pos == #screens then return nil end
+      return screens[(pos % #screens) + 1]
+    end
+
+    if not allowWrap and pos == 1 then return nil end
+    return screens[((pos - 2 + #screens) % #screens) + 1]
   end
 
-  local target = direction == "next" and win:screen():next() or win:screen():previous()
-  if target then
-    saveUndo(win)
-    win:moveToScreen(target)
+  local function postMoveAdjustments(meta)
+    if not wasFloating and displayPolicy.tiledBehavior == "retile" then
+      trace("window.displayMove", "tiled move follows retile behavior", {
+        direction = direction,
+      })
+    end
+
+    info("window.displayMove", "display move resolved", {
+      direction = direction,
+      floating = wasFloating,
+      targetDisplay = meta and meta.targetDisplay,
+      fallbackUsed = meta and meta.fallbackUsed == true or false,
+      noOp = meta and meta.noOp == true or false,
+    })
   end
+
+  if not wasFloating and useYabai then
+    local ok, err, meta = _backend:moveWindowToDisplay(win:id(), displaySel, {
+      follow = displayPolicy.followDisplay == true,
+      wrap = allowWrap,
+    })
+    if ok then
+      postMoveAdjustments(meta)
+      return true
+    end
+
+    if strictFailure then
+      _alerts.warn(err or "Failed to move window to display")
+      return false
+    end
+
+    _alerts.warn(err or "Failed to move window to display")
+    return false
+  end
+
+  if not wasFloating then
+    _alerts.warn("Display move backend unavailable for tiled window")
+    return false
+  end
+
+  local target = targetScreenForFallback()
+  if target then
+    if not beforeScreenFrame then return false end
+    local tf = target:frame()
+
+    local offsetX = beforeFrame.x - beforeScreenFrame.x
+    local offsetY = beforeFrame.y - beforeScreenFrame.y
+
+    local x = tf.x + offsetX
+    local y = tf.y + offsetY
+    local maxX = math.max(tf.x, tf.x + tf.w - beforeFrame.w)
+    local maxY = math.max(tf.y, tf.y + tf.h - beforeFrame.h)
+
+    x = clamp(x, tf.x, maxX)
+    y = clamp(y, tf.y, maxY)
+
+    saveUndo(win)
+    win:setFrame({ x = x, y = y, w = beforeFrame.w, h = beforeFrame.h })
+
+    if displayPolicy.followDisplay == true then
+      win:focus()
+    end
+
+    postMoveAdjustments({
+      targetDisplay = target:id(),
+      fallbackUsed = false,
+    })
+    return true
+  end
+
+  info("window.displayMove", "display move reached monitor edge", {
+    direction = direction,
+    wrap = allowWrap,
+  })
+  return true
 end
 
 local function applyNewWindowPolicy(win)
@@ -386,10 +485,10 @@ function M:bind(cfg, commands, backend, logger, modes, policy)
       if _undoFrames[w:id()] then w:setFrame(_undoFrames[w:id()]) end
     end,
     ["win.nextMonitor"] = function()
-      moveAcrossDisplay("next")
+      return moveAcrossDisplay("next")
     end,
     ["win.prevMonitor"] = function()
-      moveAcrossDisplay("prev")
+      return moveAcrossDisplay("prev")
     end,
     ["win.nextScreen"] = focusNextScreen,
     ["win.cycleLocal"] = cycleWindowsOnScreen,

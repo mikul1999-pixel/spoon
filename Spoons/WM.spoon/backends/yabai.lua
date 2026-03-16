@@ -86,7 +86,7 @@ local function displays()
   return query({ "query", "--displays" }) or {}
 end
 
-local function wrappedDisplayTarget(currentDisplay, displaySel)
+local function wrappedDisplayTarget(currentDisplay, displaySel, allowWrap)
   if displaySel ~= "next" and displaySel ~= "prev" then
     return tonumber(displaySel)
   end
@@ -105,8 +105,10 @@ local function wrappedDisplayTarget(currentDisplay, displaySel)
   if not pos then return nil end
 
   if displaySel == "next" then
+    if allowWrap == false and pos == #ds then return nil end
     pos = (pos % #ds) + 1
   else
+    if allowWrap == false and pos == 1 then return nil end
     pos = ((pos - 2 + #ds) % #ds) + 1
   end
 
@@ -247,12 +249,25 @@ function M:moveWindowToDisplay(winId, displaySel, opts)
   local currentFocus = focusedWindowId()
   if currentFocus ~= winId then focusWindow(winId) end
 
-  local requestedTarget = displaySel
+  local allowWrap = not (opts and opts.wrap == false)
+  local requestedTarget = wrappedDisplayTarget(before.display, displaySel, allowWrap)
+  if requestedTarget == nil then
+    return true, nil, {
+      moved = false,
+      noOp = true,
+      reason = "display-edge",
+      targetDisplay = before.display,
+    }
+  end
+
   local ok = runDisplayMove(winId, requestedTarget)
 
   if not ok then
     if currentFocus and currentFocus ~= winId then focusWindow(currentFocus) end
-    return false, "failed to run display move command"
+    return false, "failed to run display move command", {
+      moved = false,
+      targetDisplay = requestedTarget,
+    }
   end
 
   local moved = false
@@ -266,7 +281,7 @@ function M:moveWindowToDisplay(winId, displaySel, opts)
   end
 
   if not moved then
-    local wrapped = wrappedDisplayTarget(before.display, displaySel)
+    local wrapped = wrappedDisplayTarget(before.display, displaySel, true)
     if wrapped and wrapped ~= before.display then
       requestedTarget = wrapped
       ok = runDisplayMove(winId, wrapped)
@@ -314,10 +329,17 @@ function M:moveWindowToDisplay(winId, displaySel, opts)
       winId = winId,
       target = requestedTarget,
     })
-    return true
+    return true, nil, {
+      moved = true,
+      targetDisplay = requestedTarget,
+      wrapped = requestedTarget ~= before.display,
+    }
   end
 
-  return false, "window display did not change"
+  return false, "window display did not change", {
+    moved = false,
+    targetDisplay = requestedTarget,
+  }
 end
 
 function M:windowWorkspace(winId)

@@ -51,6 +51,10 @@ M.policy = {
     displayMove = {
       preferYabai = true,
       followDisplay = true,
+      wrap = true,
+      failureMode = "strict",
+      tiledBehavior = "retile",
+      floatingBehavior = "preserve_frame",
     },
     newWindow = {
       mode = "tile",
