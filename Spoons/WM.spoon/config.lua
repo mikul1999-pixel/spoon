@@ -124,7 +124,8 @@ M.bindings = {
   { key = "T", action = "app.terminal",       desc = "Terminal", ui = { section = "launch", order = 10 } },
   { key = "E", action = "app.editor",         desc = "Editor",   ui = { section = "launch", order = 20 } },
   { key = "B", action = "app.browser",        desc = "Browser",  ui = { section = "launch", order = 30 } },
-  { key = "return", action = "app.newTab",    desc = "New tab",  ui = { section = "launch", order = 40 } },
+  { key = "=", action = "app.newWindow",      desc = "New window", ui = { section = "launch", order = 40 } },
+  { key = "return", action = "app.newTab",    desc = "New tab",  ui = { section = "launch", order = 50 } },
   -- window snapping
   { key = "H", action = "win.move.left",     desc = "Move left",  ui = { section = "window", order = 10, compact = "window.move", compactKey = "H/J/K/L", compactDesc = "Move window" } },
   { key = "J", action = "win.move.down",     desc = "Move down",  ui = { section = "window", order = 11, compact = "window.move", compactKey = "H/J/K/L", compactDesc = "Move window" } },

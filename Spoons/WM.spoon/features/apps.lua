@@ -3,10 +3,12 @@ local M = {}
 -- App-specific shortcuts
 local _spoonPath
 local _bind
+local _alerts
 
 function M:init(p)
   _spoonPath = p
   _bind = dofile(_spoonPath .. "utils/bind.lua")
+  _alerts = dofile(_spoonPath .. "ui/alerts.lua")
 end
 
 local function toggleOrCycle(appName)
@@ -41,6 +43,22 @@ function M:bind(cfg, commands)
       local win = hs.window.focusedWindow()
       if not win then return end
       hs.eventtap.keyStroke({ "cmd" }, "T", win:application())
+    end,
+    ["app.newWindow"] = function()
+      local win = hs.window.focusedWindow()
+      if not win then
+        _alerts.warn("No focused app for new window")
+        return false
+      end
+
+      local app = win:application()
+      if not app then
+        _alerts.warn("No focused app for new window")
+        return false
+      end
+
+      hs.eventtap.keyStroke({ "cmd" }, "N", app)
+      return true
     end,
   }
 
