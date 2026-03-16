@@ -87,7 +87,7 @@ function WM:start()
   self.apps:bind(cfg, self.commands)
   self.window:bind(cfg, self.commands, self.backend, self.logger, self.modes, self.policy)
   self.workspaces:bind(cfg, self.commands, self.state, self.backend, self.logger, self.modes, self.policy)
-  self.layouts:bind(cfg, self.commands)
+  self.layouts:bind(cfg, self.commands, self.backend, self.logger)
   self.scratchpad:bind(cfg, self.commands, self.state, self.backend, self.logger)
   self.help:bind(cfg, self.commands)
   if not cfg.ui or not cfg.ui.statusbar or cfg.ui.statusbar.enabled ~= false then
@@ -103,6 +103,7 @@ function WM:start()
 end
 
 function WM:stop()
+  if self.layouts and self.layouts.stop then self.layouts:stop() end
   if self.help and self.help.stop then self.help:stop() end
   if self.statusbar and self.statusbar.stop then self.statusbar:stop() end
   if self._watcher then self._watcher:stop() end

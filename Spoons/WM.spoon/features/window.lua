@@ -26,7 +26,7 @@ local function effectiveScreenFrame(screen)
   local ui = _cfg and _cfg.ui and _cfg.ui.statusbar or {}
   if ui.reserveTopPadding == false then return f end
 
-  local inset = tonumber(ui.topInset) or 0
+  local inset = (tonumber(ui.topInset) or 0) + (tonumber(ui.tiledTopPadding) or 0)
   if inset <= 0 then return f end
 
   return {

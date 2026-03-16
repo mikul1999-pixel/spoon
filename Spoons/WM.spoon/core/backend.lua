@@ -190,6 +190,11 @@ function M:moveWindowToDisplay(winId, displaySel, opts)
   return _impl:moveWindowToDisplay(winId, displaySel, opts or {})
 end
 
+function M:listSpaces()
+  if not _impl or not _impl.listSpaces then return nil, "backend unavailable" end
+  return _impl:listSpaces()
+end
+
 function M:toggleFloat(winId)
   if not _impl then return false, "backend unavailable" end
   return _impl:toggleFloat(winId)

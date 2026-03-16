@@ -3,10 +3,12 @@ local M = {}
 -- UI help overlay for hyper keybindings
 local _spoonPath
 local _bind
+local _canvasSafe
 
 function M:init(p)
   _spoonPath = p
   _bind = dofile(_spoonPath .. "utils/bind.lua")
+  _canvasSafe = dofile(_spoonPath .. "ui/canvas.lua")
 end
 
 local _canvas = nil
@@ -228,7 +230,7 @@ local function createCanvas(bindings)
   local c = hs.canvas.new({ x = x, y = y, w = W, h = H })
 
   -- background + border
-  c:appendElements({
+  _canvasSafe.append(c, {
     {
       type = "rectangle", action = "fill",
       fillColor = COLORS.bg,
@@ -242,7 +244,7 @@ local function createCanvas(bindings)
   })
 
   -- title
-  c:appendElements({
+  _canvasSafe.append(c, {
     {
       type = "text",
       text = "WM hyper key bindings",
@@ -256,7 +258,7 @@ local function createCanvas(bindings)
 
   -- separator line under title
   local sepY = PAD + ROW_H + 6
-  c:appendElements({
+  _canvasSafe.append(c, {
     {
       type = "segments",
       action = "stroke",
@@ -279,7 +281,7 @@ local function createCanvas(bindings)
       if row.type == "gap" then
         ry = ry + SEC_GAP
       elseif row.type == "heading" then
-        c:appendElements({
+        _canvasSafe.append(c, {
           {
             type = "text",
             text = row.label,
@@ -292,7 +294,7 @@ local function createCanvas(bindings)
         })
         ry = ry + ROW_H
       else
-        c:appendElements({
+        _canvasSafe.append(c, {
           {
             type = "text",
             text = row.key,

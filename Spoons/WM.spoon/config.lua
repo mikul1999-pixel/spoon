@@ -23,6 +23,7 @@ M.ui = {
     pollInterval = 0.35,
     spacesRefreshInterval = 1.5,
     topInset = 34,
+    tiledTopPadding = 6,
     reserveTopPadding = true,
   },
 }
@@ -99,15 +100,26 @@ M.apps = {
 }
 
 M.layouts = {
-  dev = { -- 2 screen layout for pc development
-    { app="browser",  screen=2, x=0,   y=0,   w=1,   h=1 },
-    { app="terminal", screen=1, x=0.5, y=0,   w=0.5, h=1 },
-    { app="editor",   screen=1, x=0,   y=0,   w=0.5, h=1 },
+  dev = { -- 2 screen floating snapshot layout
+    { order = 10, app = "editor", display = 1, space = 1, waitProfile = "editor", fallback = { x = 0.0, y = 0.0, w = 0.5, h = 1.0 } },
+    { order = 20, app = "terminal", display = 1, space = 1, fallback = { x = 0.5, y = 0.0, w = 0.5, h = 1.0 } },
+    { order = 30, app = "browser", display = 2, space = 1, fallback = { x = 0.0, y = 0.0, w = 1.0, h = 1.0 } },
   },
-  laptop = { -- 1 screen layout for my laptop
-    { app="browser",  screen=1, x=0.5, y=0.5, w=0.5, h=0.5 },
-    { app="terminal", screen=1, x=0.5, y=0,   w=0.5, h=0.5 },
-    { app="editor",   screen=1, x=0,   y=0,   w=0.5, h=1   },
+  laptop = { -- 1 screen floating snapshot layout
+    { order = 10, app = "editor", display = 1, space = 1, waitProfile = "editor", fallback = { x = 0.0, y = 0.0, w = 0.5, h = 1.0 } },
+    { order = 20, app = "terminal", display = 1, space = 1, fallback = { x = 0.5, y = 0.0, w = 0.5, h = 0.5 } },
+    { order = 30, app = "browser", display = 1, space = 1, fallback = { x = 0.5, y = 0.5, w = 0.5, h = 0.5 } },
+  },
+}
+
+M.layoutRuntime = {
+  reuseExisting = true,
+  launchIfMissing = true,
+  createNewWhenRunning = false,
+  settleMs = 90,
+  waitProfiles = {
+    default = { retries = 26, intervalMs = 120 },
+    editor = { retries = 44, intervalMs = 150 },
   },
 }
 

@@ -4,6 +4,9 @@ local M = {}
 local _queue = {}
 local _showing = false
 local _canvas = nil
+local _selfPath = debug.getinfo(1, "S").source:sub(2)
+local _basePath = _selfPath:match("^(.*[/\\])")
+local _canvasSafe = dofile(_basePath .. "canvas.lua")
 
 local PALETTE = {
   info = {
@@ -25,7 +28,8 @@ local PALETTE = {
 
 local function textSize(msg)
   local ok, sz = pcall(hs.drawing.getTextDrawingSize, msg, {
-    font = { name = "Menlo", size = 13 },
+    font = "Menlo",
+    size = 13,
   })
   if ok and sz and sz.w and sz.h then
     return sz
@@ -73,7 +77,7 @@ local function showNext()
   _canvas:level(hs.canvas.windowLevels.floating)
   _canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
 
-  _canvas:appendElements({
+  _canvasSafe.append(_canvas, {
     {
       type = "rectangle",
       action = "fill",
@@ -96,7 +100,7 @@ local function showNext()
       textAlignment = "center",
       frame = { x = padX, y = padY - 1 + 4, w = w - padX * 2, h = h - padY * 2 },
     },
-  })
+  }, "alerts.showNext")
 
   _canvas:show()
   hs.timer.doAfter(dur, function()

@@ -8,6 +8,7 @@ local _state
 local _cfg
 local _logger
 local _shell
+local _canvasSafe
 local _visible = true
 local _workspaceCount = 9
 local _lastSpacesQueryAt = 0
@@ -50,6 +51,7 @@ local MODE_COLORS = {
 function M:init(p)
   _spoonPath = p
   _shell = dofile(_spoonPath .. "utils/shell.lua")
+  _canvasSafe = dofile(_spoonPath .. "ui/canvas.lua")
 end
 
 local function log(level, event, message, data)
@@ -130,7 +132,7 @@ local function render(workspace, mode)
   local cH = _canvas:frame().h
   local modeBg = MODE_COLORS[mode] or MODE_COLORS.normal
 
-  _canvas:replaceElements({
+  _canvasSafe.replace(_canvas, {
     {
       type = "rectangle",
       action = "fill",
@@ -144,11 +146,11 @@ local function render(workspace, mode)
       strokeWidth = 1,
       roundedRectRadii = { xRadius = STYLE.corner, yRadius = STYLE.corner },
     },
-  })
+  }, "statusbar.base")
 
   local y = (cH - 20) / 2 + 1
 
-  _canvas:appendElements({
+  _canvasSafe.append(_canvas, {
     {
       type = "rectangle",
       action = "fill",
@@ -164,12 +166,12 @@ local function render(workspace, mode)
       textAlignment = "center",
       frame = { x = STYLE.padX, y = y + 2, w = STYLE.modeW, h = 16 },
     },
-  })
+  }, "statusbar.mode")
 
   local x = STYLE.padX * 2 + STYLE.modeW
   for i = 1, _workspaceCount do
     local active = i == workspace
-    _canvas:appendElements({
+    _canvasSafe.append(_canvas, {
       {
         type = "rectangle",
         action = "fill",
@@ -185,7 +187,7 @@ local function render(workspace, mode)
         textAlignment = "center",
         frame = { x = x, y = y + 2, w = STYLE.tabW, h = 14 },
       },
-    })
+    }, "statusbar.tabs")
     x = x + STYLE.tabW + STYLE.tabGap
   end
 end

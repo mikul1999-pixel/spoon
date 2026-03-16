@@ -186,10 +186,27 @@ function M:init(ctx)
   local ui = ctx.config and ctx.config.ui and ctx.config.ui.statusbar or {}
   local reserve = ui.reserveTopPadding ~= false
   local topInset = tonumber(ui.topInset) or 0
+  local tiledTopPadding = tonumber(ui.tiledTopPadding) or 0
+  local barOk = false
   if reserve and topInset > 0 then
-    msg({ "config", "external_bar", "all:" .. tostring(math.floor(topInset)) .. ":0" })
+    barOk = msg({ "config", "external_bar", "all:" .. tostring(math.floor(topInset)) .. ":0" })
   else
-    msg({ "config", "external_bar", "all:0:0" })
+    barOk = msg({ "config", "external_bar", "all:0:0" })
+  end
+
+  if not barOk then
+    event("warn", "yabai.config", "failed to set external bar padding", {
+      reserveTopPadding = reserve,
+      topInset = topInset,
+    })
+  end
+
+  local padOk = msg({ "config", "top_padding", tostring(reserve and math.floor(tiledTopPadding) or 0) })
+  if not padOk then
+    event("warn", "yabai.config", "failed to set top padding", {
+      reserveTopPadding = reserve,
+      tiledTopPadding = tiledTopPadding,
+    })
   end
 
   if _policy and _policy.newWindowDefaults then
@@ -354,6 +371,12 @@ end
 function M:windowWorkspace(winId)
   if not winId then return nil end
   return windowSpace(winId)
+end
+
+function M:listSpaces()
+  local spaces, err = query({ "query", "--spaces" })
+  if not spaces then return nil, err end
+  return spaces
 end
 
 function M:isFloating(winId)
