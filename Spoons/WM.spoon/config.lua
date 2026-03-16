@@ -121,39 +121,39 @@ M.delays = {
 -- action strings are handled in their modules
 M.bindings = {
   -- apps
-  { key = "T", action = "app.terminal",       desc = "Terminal" },
-  { key = "E", action = "app.editor",         desc = "Editor" },
-  { key = "B", action = "app.browser",        desc = "Browser" },
-  { key = "return", action = "app.newTab",    desc = "New tab" },
+  { key = "T", action = "app.terminal",       desc = "Terminal", ui = { section = "launch", order = 10 } },
+  { key = "E", action = "app.editor",         desc = "Editor",   ui = { section = "launch", order = 20 } },
+  { key = "B", action = "app.browser",        desc = "Browser",  ui = { section = "launch", order = 30 } },
+  { key = "return", action = "app.newTab",    desc = "New tab",  ui = { section = "launch", order = 40 } },
   -- window snapping
-  { key = "H", action = "win.move.left",     desc = "Move left" },
-  { key = "J", action = "win.move.down",     desc = "Move down" },
-  { key = "K", action = "win.move.up",       desc = "Move up" },
-  { key = "L", action = "win.move.right",    desc = "Move right" },
-  { key = "F", action = "win.maximize",      desc = "Fullscreen" },
-  { key = "C", action = "win.center",        desc = "Center" },
-  { key = "Z", action = "win.undo",          desc = "Undo move" },
-  { key = "G", action = "win.balance",       desc = "Snap to balanced grid" },
+  { key = "H", action = "win.move.left",     desc = "Move left",  ui = { section = "window", order = 10, compact = "window.move", compactKey = "H/J/K/L", compactDesc = "Move window" } },
+  { key = "J", action = "win.move.down",     desc = "Move down",  ui = { section = "window", order = 11, compact = "window.move", compactKey = "H/J/K/L", compactDesc = "Move window" } },
+  { key = "K", action = "win.move.up",       desc = "Move up",    ui = { section = "window", order = 12, compact = "window.move", compactKey = "H/J/K/L", compactDesc = "Move window" } },
+  { key = "L", action = "win.move.right",    desc = "Move right", ui = { section = "window", order = 13, compact = "window.move", compactKey = "H/J/K/L", compactDesc = "Move window" } },
+  { key = "F", action = "win.maximize",      desc = "Fullscreen", ui = { section = "window", order = 20 } },
+  { key = "C", action = "win.center",        desc = "Center",  ui = { section = "window", order = 30 } },
+  { key = "G", action = "win.balance",       desc = "Balance", ui = { section = "window", order = 40 } },
+  { key = "Z", action = "win.undo",          desc = "Undo",    ui = { section = "window", order = 50 } },
+  { key = "space", action = "workspace.toggleFloat", desc = "Toggle float", ui = { section = "window", order = 60 } },
   -- window navigation
-  { key = "N",   action = "win.nextMonitor", desc = "Next monitor" },
-  { key = "P",   action = "win.prevMonitor", desc = "Prev monitor" },
-  { key = "tab", action = "win.nextScreen",  desc = "Focus next screen" },
-  { key = "`",   action = "win.cycleLocal",  desc = "Cycle windows" },
+  { key = "N",   action = "win.nextMonitor", desc = "Next monitor", ui = { section = "display_focus", order = 10 } },
+  { key = "P",   action = "win.prevMonitor", desc = "Prev monitor", ui = { section = "display_focus", order = 20 } },
+  { key = "tab", action = "win.nextScreen",  desc = "Focus next screen", ui = { section = "display_focus", order = 30 } },
+  { key = "`",   action = "win.cycleLocal",  desc = "Cycle local stack", ui = { section = "display_focus", order = 40 } },
   -- modes
-  { key = "R", action = "win.resizeMode",    desc = "Resize mode" },
-  { key = "W", action = "workspace.mode",    desc = "Workspace mode" },
-  { key = "S", action = "workspace.sendMode", desc = "Workspace send mode" },
-  { key = "A", action = "workspace.focusMode", desc = "Focus mode" },
-  { key = "V", action = "workspace.swapMode", desc = "Swap mode" },
-  { key = "space", action = "workspace.toggleFloat", desc = "Toggle float" },
+  { key = "R", action = "win.resizeMode",      desc = "Resize mode",    ui = { section = "modes", order = 10 } },
+  { key = "A", action = "workspace.focusMode", desc = "Focus mode",     ui = { section = "modes", order = 20 } },
+  { key = "V", action = "workspace.swapMode",  desc = "Swap mode",      ui = { section = "modes", order = 30 } },
+  { key = "W", action = "workspace.mode",      desc = "Workspace mode", ui = { section = "modes", order = 40 } },
+  { key = "S", action = "workspace.sendMode",  desc = "Send mode",      ui = { section = "modes", order = 50 } },
   -- layouts
-  { key = "D", action = "layout.dev",        desc = "Dev layout" },
-  { key = "M", action = "layout.laptop",     desc = "Laptop layout" },
+  { key = "D", action = "layout.dev",        desc = "Dev layout",    ui = { section = "layouts", order = 10 } },
+  { key = "M", action = "layout.laptop",     desc = "Laptop layout", ui = { section = "layouts", order = 20 } },
   -- scratchpad
-  { key = "[", action = "scratchpad.add",    desc = "Add to scratchpad" },
-  { key = "]", action = "scratchpad.toggle", desc = "Toggle scratchpad" },
+  { key = "[", action = "scratchpad.add",    desc = "Add to scratchpad", ui = { section = "scratchpad", order = 10 } },
+  { key = "]", action = "scratchpad.toggle", desc = "Toggle scratchpad", ui = { section = "scratchpad", order = 20 } },
   -- help
-  { key = "\\", action = "help.toggle",      desc = "Help" },
+  { key = "\\", action = "help.toggle",      desc = "Toggle help", ui = { section = "ui", order = 10 } },
 }
 
 for i = 1, M.workspaces.count do
@@ -161,6 +161,12 @@ for i = 1, M.workspaces.count do
     key = tostring(i),
     action = "workspace.focus." .. i,
     desc = "Workspace " .. i,
+    ui = {
+      section = "workspaces",
+      order = 10 + i,
+      compact = "workspace.focus.range",
+      compactDesc = "Switch workspace",
+    },
   })
 
   if M.workspaces.enableDirectSend then
@@ -168,6 +174,10 @@ for i = 1, M.workspaces.count do
       key = tostring(i),
       action = "workspace.send." .. i,
       desc = "Send to workspace " .. i,
+      ui = {
+        section = "workspaces",
+        order = 40 + i,
+      },
     })
   end
 end

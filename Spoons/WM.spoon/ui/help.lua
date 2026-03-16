@@ -19,7 +19,7 @@ local COL_W   = 260
 local COLS    = 2
 local CORNER  = 10
 local FONT_SZ = 13
-local HEAD_SZ = 12
+local HEAD_SZ = 13
 local KEY_W   = 72
 
 local COLORS = {
@@ -31,44 +31,169 @@ local COLORS = {
   title   = { red=0.800, green=0.839, blue=0.957, alpha=1 },  -- same as desc, but brighter via weight
 }
 
-local SECTION_ORDER = { "app", "win", "workspace", "layout", "scratchpad", "help", "ui" }
 local SECTION_LABELS = {
-  app = "Apps",
-  win = "Window",
-  workspace = "Workspaces",
-  layout = "Layouts",
-  scratchpad = "Scratchpad",
-  help = "Help",
+  launch = "LAUNCH",
+  window = "WINDOW",
+  display_focus = "DISPLAY & FOCUS",
+  modes = "MODES",
+  workspaces = "WORKSPACES",
+  layouts = "LAYOUTS",
+  scratchpad = "SCRATCHPAD",
   ui = "UI",
 }
 
-local function groupBindings(bindings)
-  local groups = {}
-  for _, b in ipairs(bindings) do
-    local prefix = b.action:match("^([^.]+)%.")
-    if prefix then
-      groups[prefix] = groups[prefix] or {}
-      table.insert(groups[prefix], b)
+local SECTION_ORDER = {
+  "launch",
+  "window",
+  "display_focus",
+  "modes",
+  "workspaces",
+  "layouts",
+  "scratchpad",
+  "ui",
+}
+
+local function inferSection(action)
+  if action:match("^app%.") then return "launch" end
+  if action:match("^layout%.") then return "layouts" end
+  if action:match("^scratchpad%.") then return "scratchpad" end
+  if action == "help.toggle" or action:match("^ui%.") then return "ui" end
+  if action == "win.nextScreen" or action == "win.cycleLocal" or action == "win.nextMonitor" or action == "win.prevMonitor" then
+    return "display_focus"
+  end
+  if action == "win.resizeMode" or action == "workspace.focusMode" or action == "workspace.swapMode"
+    or action == "workspace.mode" or action == "workspace.sendMode" then
+    return "modes"
+  end
+  if action:match("^workspace.focus%.") or action:match("^workspace.send%.") then return "workspaces" end
+  if action:match("^win%.") or action == "workspace.toggleFloat" then return "window" end
+  return nil
+end
+
+local function compactedRowsForSection(items)
+  table.sort(items, function(a, b)
+    return (a.order or 9999) < (b.order or 9999)
+  end)
+
+  local out = {}
+  local grouped = {}
+
+  for _, item in ipairs(items) do
+    if item.compact then
+      grouped[item.compact] = grouped[item.compact] or {}
+      table.insert(grouped[item.compact], item)
+    else
+      table.insert(out, {
+        type = "row",
+        key = item.key,
+        desc = item.desc,
+      })
     end
   end
-  return groups
+
+  local compactRows = {}
+  for _, group in pairs(grouped) do
+    table.sort(group, function(a, b)
+      return (a.order or 9999) < (b.order or 9999)
+    end)
+    local first = group[1]
+    local key = first.compactKey
+    if not key then
+      local digits = {}
+      local allDigits = true
+      for _, g in ipairs(group) do
+        local n = tonumber(g.key)
+        if not n then
+          allDigits = false
+          break
+        end
+        table.insert(digits, n)
+      end
+
+      if allDigits and #digits > 0 then
+        table.sort(digits)
+        local contiguous = true
+        for i = 2, #digits do
+          if digits[i] ~= digits[i - 1] + 1 then
+            contiguous = false
+            break
+          end
+        end
+        if contiguous then
+          key = (#digits == 1) and tostring(digits[1]) or (tostring(digits[1]) .. "-" .. tostring(digits[#digits]))
+        end
+      end
+
+      if not key then
+        local keys = {}
+        for _, g in ipairs(group) do table.insert(keys, g.key) end
+        key = table.concat(keys, "/")
+      end
+    end
+    local desc = first.compactDesc or first.desc
+    table.insert(compactRows, {
+      order = first.order or 9999,
+      row = { type = "row", key = key, desc = desc },
+    })
+  end
+
+  table.sort(compactRows, function(a, b) return a.order < b.order end)
+
+  local merged = {}
+  local simple = {}
+  for _, item in ipairs(items) do
+    if not item.compact then
+      table.insert(simple, {
+        order = item.order or 9999,
+        row = { type = "row", key = item.key, desc = item.desc },
+      })
+    end
+  end
+  for _, item in ipairs(simple) do table.insert(merged, item) end
+  for _, item in ipairs(compactRows) do table.insert(merged, item) end
+  table.sort(merged, function(a, b) return a.order < b.order end)
+
+  local rows = {}
+  for _, item in ipairs(merged) do
+    table.insert(rows, item.row)
+  end
+  return rows
 end
 
 local function buildRows(bindings)
-  local groups = groupBindings(bindings)
+  local sections = {}
+  for _, b in ipairs(bindings) do
+    local ui = b.ui or {}
+    local section = ui.section or inferSection(b.action)
+    if section then
+      sections[section] = sections[section] or {}
+      table.insert(sections[section], {
+        key = b.key:upper(),
+        desc = (ui.desc or b.desc),
+        order = ui.order,
+        compact = ui.compact,
+        compactKey = ui.compactKey,
+        compactDesc = ui.compactDesc,
+      })
+    end
+  end
   local rows = {}
+
   for _, section in ipairs(SECTION_ORDER) do
-    if groups[section] then
-      -- gap marker before every section, except first
-      if #rows > 0 then
-        table.insert(rows, { type = "gap" })
+    local items = sections[section]
+    if items and #items > 0 then
+      if #rows > 0 then table.insert(rows, { type = "gap" }) end
+      table.insert(rows, { type = "heading", label = SECTION_LABELS[section] or section })
+      for _, row in ipairs(compactedRowsForSection(items)) do
+        table.insert(rows, row)
       end
-      table.insert(rows, { type = "heading", label = (SECTION_LABELS[section] or section):upper() })
-      for _, b in ipairs(groups[section]) do
-        table.insert(rows, { type = "row", key = b.key:upper(), desc = b.desc })
+
+      if section == "modes" then
+        table.insert(rows, { type = "row", key = "ESC", desc = "Exit current mode" })
       end
     end
   end
+
   return rows
 end
 
