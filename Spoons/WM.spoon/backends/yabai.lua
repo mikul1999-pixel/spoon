@@ -199,13 +199,21 @@ end
 function M:focusedWorkspace()
   local space = query({ "query", "--spaces", "--space" })
   local id = space and space.index or nil
-  if id and _state then _state:setCurrentWorkspace(id) end
+  if id and _state and _state.setFocusSnapshot then
+    _state:setFocusSnapshot({
+      workspaceId = id,
+      displayId = space and space.display,
+      source = "backend.yabai.focusedWorkspace",
+    })
+  end
   return id
 end
 
 function M:focusWorkspace(workspaceId)
   local ok = msg({ "space", "--focus", tostring(workspaceId) })
-  if ok and _state then _state:setCurrentWorkspace(workspaceId) end
+  if ok and _state and _state.setCurrentWorkspace then
+    _state:setCurrentWorkspace(workspaceId, "backend.yabai.focusWorkspace")
+  end
   return ok, ok and nil or "failed to focus workspace"
 end
 
@@ -214,6 +222,14 @@ function M:sendWindowToWorkspace(winId, workspaceId, opts)
 
   local ok = moveWindow(winId, workspaceId)
   if not ok then return false, "window did not move to workspace" end
+
+  if _state and _state.setFocusSnapshot then
+    _state:setFocusSnapshot({
+      windowId = winId,
+      workspaceId = workspaceId,
+      source = "backend.yabai.sendWindow",
+    })
+  end
 
   if opts and opts.sendFollow then
     self:focusWorkspace(workspaceId)
@@ -285,6 +301,15 @@ function M:moveWindowToDisplay(winId, displaySel, opts)
   if currentFocus and currentFocus ~= winId then focusWindow(currentFocus) end
 
   if moved then
+    local after = windowInfo(winId)
+    if _state and _state.setFocusSnapshot then
+      _state:setFocusSnapshot({
+        windowId = winId,
+        displayId = after and after.display or tonumber(requestedTarget),
+        workspaceId = after and after.space,
+        source = "backend.yabai.moveDisplay",
+      })
+    end
     event("trace", "yabai.display.move", "moved window to display", {
       winId = winId,
       target = requestedTarget,
@@ -447,22 +472,30 @@ end
 function M:health()
   local spaces, spacesErr = query({ "query", "--spaces" })
   if not spaces then
-    return {
+    local failed = {
       ok = false,
       backend = "yabai",
       path = _path,
       error = spacesErr,
     }
+    if _state and _state.setBackendHealth then
+      _state:setBackendHealth(failed, "backend.yabai.health")
+    end
+    return failed
   end
 
   local focused = self:focusedWorkspace()
-  return {
+  local healthy = {
     ok = true,
     backend = "yabai",
     path = _path,
     focusedWorkspace = focused,
     workspaceCount = #spaces,
   }
+  if _state and _state.setBackendHealth then
+    _state:setBackendHealth(healthy, "backend.yabai.health")
+  end
+  return healthy
 end
 
 return M

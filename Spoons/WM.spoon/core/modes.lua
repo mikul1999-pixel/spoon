@@ -3,6 +3,7 @@ local M = {}
 -- Centralized modal mode manager for directional flow
 local _spoonPath
 local _alerts
+local _state
 
 local _modes = {}
 local _active = nil
@@ -19,6 +20,16 @@ end
 function M:reset()
   _modes = {}
   _active = nil
+  if _state and _state.setMode then
+    _state:setMode("normal", "modes.reset")
+  end
+end
+
+function M:setState(state)
+  _state = state
+  if _state and _state.setMode then
+    _state:setMode("normal", "modes.attach")
+  end
 end
 
 function M:active()
@@ -79,12 +90,18 @@ function M:register(name, spec)
 
   function modal:entered()
     setActive(name)
+    if _state and _state.setMode then
+      _state:setMode(name, "modes.enter")
+    end
     if spec.enterMessage then _alerts.show(spec.enterMessage) end
     if spec.onEnter then spec.onEnter() end
   end
 
   function modal:exited()
     if _active == name then setActive(nil) end
+    if _state and _state.setMode then
+      _state:setMode("normal", "modes.exit")
+    end
     if spec.exitMessage then _alerts.show(spec.exitMessage) end
     if spec.onExit then spec.onExit() end
   end

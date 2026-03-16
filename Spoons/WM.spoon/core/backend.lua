@@ -6,6 +6,7 @@ local _impl = nil
 local _cfg = {}
 local _logger = nil
 local _policy = nil
+local _state = nil
 
 local function log(level, event, message, data)
   if not _logger or not _logger[level] then return end
@@ -85,6 +86,7 @@ function M:init(ctx)
   _cfg = config
   _logger = ctx.logger
   _policy = ctx.policy
+  _state = ctx.state
   local name = config.workspaces and config.workspaces.backend or "yabai"
 
   if name ~= "yabai" then
@@ -205,9 +207,17 @@ end
 
 function M:health()
   if not _impl or not _impl.health then
-    return { ok = false, backend = nil, error = "backend unavailable" }
+    local failed = { ok = false, backend = nil, error = "backend unavailable" }
+    if _state and _state.setBackendHealth then
+      _state:setBackendHealth(failed, "backend.wrapper.health")
+    end
+    return failed
   end
-  return _impl:health()
+  local health = _impl:health()
+  if _state and _state.setBackendHealth then
+    _state:setBackendHealth(health, "backend.wrapper.health")
+  end
+  return health
 end
 
 return M

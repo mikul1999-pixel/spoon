@@ -39,7 +39,9 @@ function WM:start()
   self.logger:configure(cfg)
 
   self.commands:reset()
+  self.commands:setState(self.state)
   self.state:reset()
+  self.modes:setState(self.state)
   self.modes:reset()
   self.policy:configure(cfg, self.logger)
   self.backend:init({
@@ -62,6 +64,10 @@ function WM:start()
   self.commands:register("wm.debugLast", function(args)
     local n = args and args.count or 25
     print(hs.inspect(self.logger:last(n)))
+  end, { category = "wm" })
+
+  self.commands:register("wm.stateDump", function()
+    print(self.state:dump())
   end, { category = "wm" })
 
   -- auto reload on .lua changes

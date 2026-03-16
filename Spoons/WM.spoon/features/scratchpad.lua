@@ -16,7 +16,19 @@ function M:init(p)
 end
 
 local _scratchpads = {}
-local _lastIndex = 0
+
+local function getLastIndex()
+  if _state and _state.scratchpadLastIndex then
+    return _state:scratchpadLastIndex()
+  end
+  return 0
+end
+
+local function setLastIndex(value)
+  if _state and _state.setScratchpadLastIndex then
+    _state:setScratchpadLastIndex(value)
+  end
+end
 
 local function defaults()
   return {
@@ -44,7 +56,8 @@ local function removeById(winId)
       if s.watcher then s.watcher:stop() end
       table.remove(_scratchpads, i)
       _state:removeScratchOrigin(winId)
-      if _lastIndex >= i then _lastIndex = math.max(0, _lastIndex - 1) end
+      local idx = getLastIndex()
+      if idx >= i then setLastIndex(math.max(0, idx - 1)) end
       return
     end
   end
@@ -172,20 +185,21 @@ function M:toggle()
     win:focus()
   end
 
-  if _lastIndex > 0 and _lastIndex <= #_scratchpads then
-    local s = _scratchpads[_lastIndex]
+  local currentIndex = getLastIndex()
+  if currentIndex > 0 and currentIndex <= #_scratchpads then
+    local s = _scratchpads[currentIndex]
     if not isHidden(s) then
       hide(s)
       return
     end
   end
 
-  local start = (_lastIndex % #_scratchpads) + 1
+  local start = (currentIndex % #_scratchpads) + 1
   for offset = 0, #_scratchpads - 1 do
     local i = (start + offset - 1) % #_scratchpads + 1
     local s = _scratchpads[i]
     if isHidden(s) then
-      _lastIndex = i
+      setLastIndex(i)
       show(s)
       return
     end
