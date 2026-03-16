@@ -11,6 +11,9 @@ local _logger
 local _modes
 local _policy
 local _newWindowFilter
+local _focusTracker
+local _screenCycleMru = {}
+local _suppressCycleFocusTracking = false
 
 function M:init(p)
   _spoonPath = p
@@ -336,6 +339,86 @@ local function ensureNewWindowWatcher()
   end)
 end
 
+local function cycleScreenKey(screen)
+  return tostring(screen and screen:id() or "unknown")
+end
+
+local function removeIdFromList(list, winId)
+  if not list then return end
+  for i = #list, 1, -1 do
+    if list[i] == winId then
+      table.remove(list, i)
+    end
+  end
+end
+
+local function isCycleCandidate(win, screen)
+  if not win or not win:id() then return false end
+  if not win:isStandard() then return false end
+  if not win:isVisible() then return false end
+  if win:isMinimized() then return false end
+  if screen and win:screen() ~= screen then return false end
+  return true
+end
+
+local function ensureCycleListForScreen(screen)
+  local key = cycleScreenKey(screen)
+  _screenCycleMru[key] = _screenCycleMru[key] or {}
+  return _screenCycleMru[key], key
+end
+
+local function trackFocusedForCycle(win)
+  if _suppressCycleFocusTracking then return end
+  if not win then return end
+  local winId = win:id()
+  if not winId then return end
+  local screen = win:screen()
+  if not screen then return end
+  if not isCycleCandidate(win, screen) then return end
+
+  for _, list in pairs(_screenCycleMru) do
+    removeIdFromList(list, winId)
+  end
+
+  local list = ensureCycleListForScreen(screen)
+  table.insert(list, 1, winId)
+end
+
+local function cycleCandidateIds(screen)
+  local list = ensureCycleListForScreen(screen)
+  local ids = {}
+  local seen = {}
+
+  for _, winId in ipairs(list) do
+    local win = hs.window.get(winId)
+    if isCycleCandidate(win, screen) and not seen[winId] then
+      table.insert(ids, winId)
+      seen[winId] = true
+    end
+  end
+
+  for _, win in ipairs(hs.window.orderedWindows()) do
+    local winId = win:id()
+    if winId and not seen[winId] and isCycleCandidate(win, screen) then
+      table.insert(ids, winId)
+      seen[winId] = true
+    end
+  end
+
+  local key = cycleScreenKey(screen)
+  _screenCycleMru[key] = ids
+  return ids
+end
+
+local function ensureFocusTracker()
+  if _focusTracker then return end
+
+  _focusTracker = hs.window.filter.new()
+  _focusTracker:subscribe(hs.window.filter.windowFocused, function(win)
+    trackFocusedForCycle(win)
+  end)
+end
+
 local function focusNextScreen()
   local win = hs.window.focusedWindow()
   if not win then return end
@@ -349,14 +432,32 @@ local function cycleWindowsOnScreen()
   local focused = hs.window.focusedWindow()
   if not focused then return end
   local screen = focused:screen()
-  local onScreen = hs.fnutils.filter(hs.window.orderedWindows(), function(w)
-    return w:screen() == screen and w:isVisible()
-  end)
-  if #onScreen < 2 then return end
-  for i, w in ipairs(onScreen) do
-    if w:id() == focused:id() then
-      onScreen[(i % #onScreen) + 1]:focus()
-      return
+
+  local ids = cycleCandidateIds(screen)
+  if #ids < 2 then return end
+
+  local focusedId = focused:id()
+  local start = 0
+  for i, winId in ipairs(ids) do
+    if winId == focusedId then
+      start = i
+      break
+    end
+  end
+
+  for step = 1, #ids do
+    local idx = ((start + step - 1) % #ids) + 1
+    local winId = ids[idx]
+    if winId ~= focusedId then
+      local nextWin = hs.window.get(winId)
+      if isCycleCandidate(nextWin, screen) then
+        _suppressCycleFocusTracking = true
+        nextWin:focus()
+        hs.timer.doAfter(0, function()
+          _suppressCycleFocusTracking = false
+        end)
+        return
+      end
     end
   end
 end
@@ -458,6 +559,7 @@ function M:bind(cfg, commands, backend, logger, modes, policy)
   local gaps = cfg.gaps
   ensureResizeMode(commands)
   ensureNewWindowWatcher()
+  ensureFocusTracker()
 
   local actions = {
     ["win.move.left"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "left", gaps) end,

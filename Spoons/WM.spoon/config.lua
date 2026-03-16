@@ -158,7 +158,6 @@ M.bindings = {
   { key = "A", action = "workspace.focusMode", desc = "Focus mode",     ui = { section = "modes", order = 20 } },
   { key = "V", action = "workspace.swapMode",  desc = "Swap mode",      ui = { section = "modes", order = 30 } },
   { key = "W", action = "workspace.mode",      desc = "Workspace mode", ui = { section = "modes", order = 40 } },
-  { key = "S", action = "workspace.sendMode",  desc = "Send mode",      ui = { section = "modes", order = 50 } },
   -- layouts
   { key = "D", action = "layout.dev",        desc = "Dev layout",    ui = { section = "layouts", order = 10 } },
   { key = "M", action = "layout.laptop",     desc = "Laptop layout", ui = { section = "layouts", order = 20 } },

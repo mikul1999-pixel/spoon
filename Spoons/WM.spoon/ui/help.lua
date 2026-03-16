@@ -64,7 +64,7 @@ local function inferSection(action)
     return "display_focus"
   end
   if action == "win.resizeMode" or action == "workspace.focusMode" or action == "workspace.swapMode"
-    or action == "workspace.mode" or action == "workspace.sendMode" then
+    or action == "workspace.mode" then
     return "modes"
   end
   if action:match("^workspace.focus%.") or action:match("^workspace.send%.") then return "workspaces" end
