@@ -19,6 +19,11 @@ M.workspaces = {
 M.behavior = {
   balanceAfterDirectionalMove = false,
   directionalFallback = true,
+  directionalPolicy = {
+    move = "smart",
+    focus = "smart",
+    swap = "smart",
+  },
   autoFloatForGeometry = true,
   autoFloatOnMoveFailure = false,
   autoFloatOnDisplayMoveFailure = false,
@@ -28,6 +33,34 @@ M.behavior = {
   placementHorizontalRatio = 0.5,
   placementVerticalBandRatio = 0.5,
   placementEdgeWarpPasses = 6,
+}
+
+M.policy = {
+  defaults = {
+    directional = {
+      move = "smart",
+      focus = "smart",
+      swap = "smart",
+    },
+    autoFloat = {
+      geometry = true,
+      moveFailure = false,
+      displayMoveFailure = false,
+      swapFailure = false,
+    },
+    displayMove = {
+      preferYabai = true,
+      followDisplay = true,
+    },
+    newWindow = {
+      mode = "tile",
+      insertion = "stack_end",
+      focus = true,
+    },
+  },
+  appRules = {
+    { app = "Notes", mode = "float", focus = true },
+  },
 }
 
 M.debug = {

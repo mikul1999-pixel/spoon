@@ -5,6 +5,7 @@ local M = {}
 local _impl = nil
 local _cfg = {}
 local _logger = nil
+local _policy = nil
 
 local function log(level, event, message, data)
   if not _logger or not _logger[level] then return end
@@ -21,27 +22,49 @@ local function fallbackOrder(dir)
   return map[dir] or { dir }
 end
 
-local function runDirectional(actionName, dir, fn)
+local function directionalPolicy(action)
+  if _policy and _policy.directionMode then
+    return _policy:directionMode(action, { component = "backend" })
+  end
+
+  local behavior = _cfg.behavior or {}
+  local map = behavior.directionalPolicy or {}
+  local mode = map[action]
+  if mode == "strict" or mode == "smart" then return mode end
+
+  if behavior.directionalFallback ~= nil then
+    if behavior.directionalFallback then return "smart" end
+    return "strict"
+  end
+
+  return "smart"
+end
+
+local function runDirectional(action, eventName, dir, fn)
   -- Try direction first, then configured fallback directions
-  local order = (_cfg.behavior and _cfg.behavior.directionalFallback) and fallbackOrder(dir) or { dir }
+  local mode = directionalPolicy(action)
+  local useFallback = mode ~= "strict"
+  local order = useFallback and fallbackOrder(dir) or { dir }
   local firstErr = nil
 
   for index, candidate in ipairs(order) do
     local ok, err = fn(candidate)
     if ok then
       if index > 1 then
-        log("info", actionName, "used fallback direction", {
+        log("info", eventName, "used fallback direction", {
           requested = dir,
           resolved = candidate,
+          policy = mode,
         })
       end
       return true, nil, candidate
     end
     if firstErr == nil then firstErr = err end
-    log("debug", actionName, "direction attempt failed", {
+    log("debug", eventName, "direction attempt failed", {
       requested = dir,
       attempted = candidate,
       error = err,
+      policy = mode,
     })
   end
 
@@ -61,6 +84,7 @@ function M:init(ctx)
   local config = ctx.config or {}
   _cfg = config
   _logger = ctx.logger
+  _policy = ctx.policy
   local name = config.workspaces and config.workspaces.backend or "yabai"
 
   if name ~= "yabai" then
@@ -105,27 +129,32 @@ end
 
 function M:focusDirection(dir)
   if not _impl then return false, "backend unavailable" end
-  return runDirectional("focus.direction", dir, function(candidate)
+  return runDirectional("focus", "focus.direction", dir, function(candidate)
     return _impl:focusDirection(candidate)
   end)
 end
 
 function M:swapDirection(dir)
   if not _impl then return false, "backend unavailable" end
-  return runDirectional("swap.direction", dir, function(candidate)
+  return runDirectional("swap", "swap.direction", dir, function(candidate)
     return _impl:swapDirection(candidate)
   end)
 end
 
 function M:moveWindowDirection(winId, dir)
   if not _impl or not _impl.moveWindowDirection then return false, "backend unavailable" end
-  local ok, err, resolved = runDirectional("move.direction", dir, function(candidate)
+  local ok, err, resolved = runDirectional("move", "move.direction", dir, function(candidate)
     return _impl:moveWindowDirection(winId, candidate)
   end)
 
   if ok then return true, nil, resolved end
 
-  if _cfg.behavior and _cfg.behavior.autoFloatOnMoveFailure then
+  local shouldFloat = (_policy and _policy.shouldAutoFloat and _policy:shouldAutoFloat("moveFailure", {
+    component = "backend",
+    action = "move",
+  }))
+    or (_cfg.behavior and _cfg.behavior.autoFloatOnMoveFailure)
+  if shouldFloat then
     local toggled = self:toggleFloat(winId)
     if toggled then
       log("info", "move.direction", "auto-floated window after move failure", { winId = winId })
@@ -141,7 +170,7 @@ function M:placeWindow(winId, dir)
     return self:moveWindowDirection(winId, dir)
   end
 
-  local ok, err, resolved = runDirectional("place.direction", dir, function(candidate)
+  local ok, err, resolved = runDirectional("move", "place.direction", dir, function(candidate)
     return _impl:placeWindow(winId, candidate)
   end)
 

@@ -24,6 +24,7 @@ function WM:init()
   self.commands   = req("core/commands")
   self.state      = req("core/state")
   self.modes      = req("core/modes")
+  self.policy     = req("core/policy")
   self.backend    = req("core/backend")
   self.apps       = req("features/apps")
   self.window     = req("features/window")
@@ -40,11 +41,13 @@ function WM:start()
   self.commands:reset()
   self.state:reset()
   self.modes:reset()
+  self.policy:configure(cfg, self.logger)
   self.backend:init({
     spoonPath = self.spoonPath,
     config = cfg,
     state = self.state,
     logger = self.logger,
+    policy = self.policy,
   })
 
   self.commands:register("wm.backendHealth", function()
@@ -70,8 +73,8 @@ function WM:start()
   self._watcher:start()
 
   self.apps:bind(cfg, self.commands)
-  self.window:bind(cfg, self.commands, self.backend, self.logger, self.modes)
-  self.workspaces:bind(cfg, self.commands, self.state, self.backend, self.logger, self.modes)
+  self.window:bind(cfg, self.commands, self.backend, self.logger, self.modes, self.policy)
+  self.workspaces:bind(cfg, self.commands, self.state, self.backend, self.logger, self.modes, self.policy)
   self.layouts:bind(cfg, self.commands)
   self.scratchpad:bind(cfg, self.commands, self.state, self.backend, self.logger)
   self.help:bind(cfg, self.commands)

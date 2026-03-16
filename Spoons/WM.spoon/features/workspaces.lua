@@ -7,14 +7,16 @@ local _alerts
 local _logger
 local _backend
 local _state
-local _cfg
 local _modes
 local _modeWindowId
+local _direction
+local _policy
 
 function M:init(p)
   _spoonPath = p
   _bind = dofile(_spoonPath .. "utils/bind.lua")
   _alerts = dofile(_spoonPath .. "ui/alerts.lua")
+  _direction = dofile(_spoonPath .. "utils/direction.lua")
 end
 
 local function logInfo(event, message, data)
@@ -43,54 +45,6 @@ local function sendTargetWindowId()
   return focusedWindowId()
 end
 
-local function directionalTarget(win, dir)
-  local wf = win:frame()
-  local wcx = wf.x + wf.w / 2
-  local wcy = wf.y + wf.h / 2
-  local screen = win:screen()
-
-  local candidates = hs.fnutils.filter(hs.window.orderedWindows(), function(w)
-    return w:id() ~= win:id() and w:isVisible() and not w:isMinimized() and w:screen() == screen
-  end)
-
-  local bestWindow = nil
-  local bestScore = nil
-
-  for _, candidate in ipairs(candidates) do
-    local cf = candidate:frame()
-    local ccx = cf.x + cf.w / 2
-    local ccy = cf.y + cf.h / 2
-    local dx = ccx - wcx
-    local dy = ccy - wcy
-
-    local primary = nil
-    local secondary = nil
-    if dir == "left" and dx < 0 then
-      primary = -dx
-      secondary = math.abs(dy)
-    elseif dir == "right" and dx > 0 then
-      primary = dx
-      secondary = math.abs(dy)
-    elseif dir == "up" and dy < 0 then
-      primary = -dy
-      secondary = math.abs(dx)
-    elseif dir == "down" and dy > 0 then
-      primary = dy
-      secondary = math.abs(dx)
-    end
-
-    if primary then
-      local score = primary + secondary * 0.35
-      if not bestScore or score < bestScore then
-        bestScore = score
-        bestWindow = candidate
-      end
-    end
-  end
-
-  return bestWindow
-end
-
 local function ensureFloating(win)
   local status = _backend:isFloating(win:id())
   if status == true then return true end
@@ -106,7 +60,7 @@ local function swapFloatingFrames(dir)
   local source = focusedWindow()
   if not source then return false, "No focused window" end
 
-  local target = directionalTarget(source, dir)
+  local target = _direction.directionalTarget(source, dir, { sameScreen = true })
   if not target then return false, "No window " .. dir end
 
   if not ensureFloating(source) then
@@ -182,7 +136,11 @@ local function swapDirectional(dir)
     return
   end
 
-  if not focusedFloating and _cfg.behavior and _cfg.behavior.autoFloatOnMoveFailure then
+  local allowSwapFloatFallback = (_policy and _policy.shouldAutoFloat and _policy:shouldAutoFloat("swapFailure", {
+    component = "workspace",
+  }))
+    or false
+  if not focusedFloating and allowSwapFloatFallback then
     local toggleOk = _backend:toggleFloat(win:id())
     if toggleOk then
       hs.timer.usleep(60000)
@@ -264,12 +222,12 @@ local function ensureModes(commands, actions, count)
   actions["workspace.swapMode"] = function() _modes:enter("swap") end
 end
 
-function M:bind(cfg, commands, state, backend, logger, modes)
+function M:bind(cfg, commands, state, backend, logger, modes, policy)
   _logger = logger
   _backend = backend
   _state = state
-  _cfg = cfg
   _modes = modes
+  _policy = policy
 
   local wc = cfg.workspaces or {}
   local count = wc.count or 9

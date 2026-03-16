@@ -11,6 +11,7 @@ local _retryCount
 local _placementHorizontalRatio
 local _placementVerticalBandRatio
 local _placementEdgeWarpPasses
+local _policy
 
 local function log(msg)
   if _debug then hs.printf("[wm.yabai] %s", msg) end
@@ -178,6 +179,17 @@ function M:init(ctx)
   _placementVerticalBandRatio = (ctx.config.behavior and ctx.config.behavior.placementVerticalBandRatio) or 0.34
   _placementEdgeWarpPasses = (ctx.config.behavior and ctx.config.behavior.placementEdgeWarpPasses) or 6
   _logger = ctx.logger
+  _policy = ctx.policy
+
+  if _policy and _policy.newWindowDefaults then
+    local newWindow = _policy:newWindowDefaults()
+    local placement = nil
+    if newWindow.insertion == "stack_start" then placement = "first_child" end
+    if newWindow.insertion == "stack_end" then placement = "second_child" end
+    if placement then
+      msg({ "config", "window_placement", placement })
+    end
+  end
 end
 
 function M:name()
@@ -321,7 +333,7 @@ function M:moveWindowDirection(winId, dir)
 end
 
 function M:placeWindow(winId, dir)
-  -- Deterministic placement intent (edge move + ratio normalization).
+  -- Deterministic placement intent (edge move + normalize ratio)
   local mapped = directionName(dir)
   if not mapped then return false, "invalid direction" end
 

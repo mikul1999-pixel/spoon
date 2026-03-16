@@ -9,6 +9,8 @@ local _backend
 local _cfg
 local _logger
 local _modes
+local _policy
+local _newWindowFilter
 
 function M:init(p)
   _spoonPath = p
@@ -52,9 +54,25 @@ local function info(event, message, data)
   end
 end
 
+local function shouldAutoFloat(reason)
+  if _policy and _policy.shouldAutoFloat then
+    local byReason = _policy:shouldAutoFloat(reason, { component = "window" })
+    if byReason then return true end
+    if reason ~= "moveFailure" and reason ~= "displayMoveFailure" then
+      return _policy:shouldAutoFloat("geometry", { component = "window", fallbackFrom = reason })
+    end
+    return false
+  end
+
+  local behavior = _cfg.behavior or {}
+  if reason == "moveFailure" then return behavior.autoFloatOnMoveFailure == true end
+  if reason == "displayMoveFailure" then return behavior.autoFloatOnDisplayMoveFailure == true end
+  return behavior.autoFloatForGeometry == true
+end
+
 local function ensureFloating(win, reason)
   if isFloating(win) then return true end
-  if not (_cfg.behavior and _cfg.behavior.autoFloatForGeometry) then return false end
+  if not shouldAutoFloat(reason) then return false end
 
   local ok, err = _backend:toggleFloat(win:id())
   if not ok then
@@ -91,7 +109,7 @@ local function moveTiledOrSnap(win, dir, gaps)
 
   local ok, err, resolved = _backend:placeWindow(win:id(), dir)
   if not ok then
-    if _cfg.behavior and _cfg.behavior.autoFloatOnMoveFailure and ensureFloating(win, "moveFallback") then
+    if ensureFloating(win, "moveFailure") then
       info("window.move", "fallback to floating snap after tiled move failure", {
         direction = dir,
         error = err,
@@ -121,20 +139,24 @@ local function moveTiledOrSnap(win, dir, gaps)
 end
 
 local function moveAcrossDisplay(direction)
-  -- Cross-display move with Yabai-first path and optional floating fallback.
+  -- Cross monitor move. yabai path with floating fallback
   local win = hs.window.focusedWindow()
   if not win then return end
 
-  local useYabai = not (_cfg.behavior and _cfg.behavior.preferYabaiDisplayMove == false)
+  local displayPolicy = _policy and _policy.displayMove and _policy:displayMove({
+    component = "window",
+    direction = direction,
+  }) or {}
+  local useYabai = displayPolicy.preferYabai ~= false
   local displaySel = direction == "next" and "next" or "prev"
 
   if useYabai then
     local ok, err = _backend:moveWindowToDisplay(win:id(), displaySel, {
-      follow = _cfg.behavior and _cfg.behavior.followDisplayOnMove,
+      follow = displayPolicy.followDisplay == true,
     })
     if ok then return end
 
-    if _cfg.behavior and _cfg.behavior.autoFloatOnDisplayMoveFailure and ensureFloating(win, "displayMove") then
+    if ensureFloating(win, "displayMoveFailure") then
       info("window.displayMove", "fallback to floating display move", {
         direction = direction,
         error = err,
@@ -150,6 +172,51 @@ local function moveAcrossDisplay(direction)
     saveUndo(win)
     win:moveToScreen(target)
   end
+end
+
+local function applyNewWindowPolicy(win)
+  if not win or not _policy then return end
+  if not win:isStandard() then return end
+
+  local app = win:application()
+  local appName = app and app:name() or ""
+  local rule = _policy:newWindowRule(appName)
+  if not rule then return end
+
+  if rule.mode == "float" then
+    local floating = _backend:isFloating(win:id())
+    if floating ~= true then
+      local ok, err = _backend:toggleFloat(win:id())
+      if not ok then
+        trace("window.policy", "failed applying float rule", {
+          app = appName,
+          error = err,
+        })
+        return
+      end
+      info("window.policy", "applied float app rule", {
+        app = appName,
+        source = rule.source,
+      })
+    end
+  else
+    trace("window.policy", "new window kept tiled", {
+      app = appName,
+      source = rule.source,
+      insertion = rule.insertion,
+    })
+  end
+end
+
+local function ensureNewWindowWatcher()
+  if _newWindowFilter then return end
+
+  _newWindowFilter = hs.window.filter.new()
+  _newWindowFilter:subscribe(hs.window.filter.windowCreated, function(win)
+    hs.timer.doAfter(0.12, function()
+      applyNewWindowPolicy(win)
+    end)
+  end)
 end
 
 local function focusNextScreen()
@@ -265,13 +332,15 @@ local function ensureResizeMode(commands)
   })
 end
 
-function M:bind(cfg, commands, backend, logger, modes)
+function M:bind(cfg, commands, backend, logger, modes, policy)
   _cfg = cfg
   _backend = backend
   _logger = logger
   _modes = modes
+  _policy = policy
   local gaps = cfg.gaps
   ensureResizeMode(commands)
+  ensureNewWindowWatcher()
 
   local actions = {
     ["win.move.left"] = function() moveTiledOrSnap(hs.window.focusedWindow(), "left", gaps) end,
