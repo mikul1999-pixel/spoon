@@ -86,7 +86,7 @@ M.debug = {
 }
 
 M.scratchpad = {
-  useWorkspaceTransport = true,
+  useWorkspaceTransport = false,
   workspace = 9,
   retrieveTarget = "current",
   followOnRetrieve = false,

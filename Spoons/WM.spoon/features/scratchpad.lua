@@ -32,7 +32,7 @@ end
 
 local function defaults()
   return {
-    useWorkspaceTransport = true,
+    useWorkspaceTransport = false,
     workspace = 9,
     retrieveTarget = "current",
     followOnRetrieve = false,
@@ -86,6 +86,20 @@ local function workspaceHidden(entry)
   return ws == scratchWorkspace()
 end
 
+local function retrieveWorkspace(entry)
+  local target = currentWorkspace()
+  if _cfg.retrieveTarget == "origin" then
+    target = _state:scratchOrigin(entry.id) or entry.originWorkspace or target
+  end
+  return target
+end
+
+local function raiseAndFocus(win)
+  if not win then return end
+  if win.raise then win:raise() end
+  win:focus()
+end
+
 local function toWorkspace(entry, workspaceId, opts)
   -- Sends scratchpad window via backend; falls back to minimize when needed.
   local ok = _backend:sendWindowToWorkspace(entry.id, workspaceId, opts or {})
@@ -124,6 +138,7 @@ function M:add()
     frame = win:frame(),
     screen = win:screen(),
     watcher = watchWindow(win),
+    originWorkspace = originWorkspace,
     mode = "workspace",
   }
 
@@ -167,13 +182,18 @@ function M:toggle()
     if not win then return end
 
     if entry.mode == "workspace" then
-      local target = currentWorkspace()
-      if _cfg.retrieveTarget == "origin" then
-        target = _state:scratchOrigin(entry.id) or entry.originWorkspace or target
-      end
+      local target = retrieveWorkspace(entry)
       toWorkspace(entry, target, { sendFollow = _cfg.followOnRetrieve })
     else
+      local target = retrieveWorkspace(entry)
+      local moved = false
+      if _backend and target then
+        moved = _backend:sendWindowToWorkspace(entry.id, target, { sendFollow = false }) == true
+      end
       win:unminimize()
+      if (not moved) and _backend and target then
+        _backend:sendWindowToWorkspace(entry.id, target, { sendFollow = false })
+      end
     end
 
     local isFloating = _backend:isFloating(entry.id)
@@ -182,7 +202,7 @@ function M:toggle()
       win:setFrame(entry.frame)
       win:setFullScreen(false)
     end
-    win:focus()
+    raiseAndFocus(win)
   end
 
   local currentIndex = getLastIndex()
