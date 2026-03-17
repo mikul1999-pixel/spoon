@@ -27,17 +27,6 @@ local function directionalPolicy(action)
   if _policy and _policy.directionMode then
     return _policy:directionMode(action, { component = "backend" })
   end
-
-  local behavior = _cfg.behavior or {}
-  local map = behavior.directionalPolicy or {}
-  local mode = map[action]
-  if mode == "strict" or mode == "smart" then return mode end
-
-  if behavior.directionalFallback ~= nil then
-    if behavior.directionalFallback then return "smart" end
-    return "strict"
-  end
-
   return "smart"
 end
 
@@ -155,7 +144,7 @@ function M:moveWindowDirection(winId, dir)
     component = "backend",
     action = "move",
   }))
-    or (_cfg.behavior and _cfg.behavior.autoFloatOnMoveFailure)
+    or false
   if shouldFloat then
     local toggled = self:toggleFloat(winId)
     if toggled then

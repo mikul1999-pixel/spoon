@@ -73,6 +73,12 @@ local function info(event, message, data)
   end
 end
 
+local function warn(event, message, data)
+  if _logger and _logger.warn then
+    _logger:warn(event, message, data)
+  end
+end
+
 local function shouldAutoFloat(reason)
   if _policy and _policy.shouldAutoFloat then
     local byReason = _policy:shouldAutoFloat(reason, { component = "window" })
@@ -82,11 +88,14 @@ local function shouldAutoFloat(reason)
     end
     return false
   end
+  return false
+end
 
-  local behavior = _cfg.behavior or {}
-  if reason == "moveFailure" then return behavior.autoFloatOnMoveFailure == true end
-  if reason == "displayMoveFailure" then return behavior.autoFloatOnDisplayMoveFailure == true end
-  return behavior.autoFloatForGeometry == true
+local function backendOptions(context)
+  if _policy and _policy.backend then
+    return _policy:backend(context or { component = "window" })
+  end
+  return {}
 end
 
 local function ensureFloating(win, reason)
@@ -154,7 +163,8 @@ local function moveTiledOrSnap(win, dir, gaps)
     })
   end
 
-  if _cfg.behavior and _cfg.behavior.balanceAfterDirectionalMove then
+  local backendCfg = backendOptions({ component = "window", action = "move" })
+  if backendCfg.balanceAfterDirectionalMove == true then
     workspaceBalance()
   end
 end
@@ -233,33 +243,8 @@ local function moveAcrossDisplay(direction)
     })
   end
 
-  if not wasFloating and useYabai then
-    local ok, err, meta = _backend:moveWindowToDisplay(win:id(), displaySel, {
-      follow = displayPolicy.followDisplay == true,
-      wrap = allowWrap,
-    })
-    if ok then
-      postMoveAdjustments(meta)
-      return true
-    end
-
-    if strictFailure then
-      _alerts.warn(err or "Failed to move window to display")
-      return false
-    end
-
-    _alerts.warn(err or "Failed to move window to display")
-    return false
-  end
-
-  if not wasFloating then
-    _alerts.warn("Display move backend unavailable for tiled window")
-    return false
-  end
-
-  local target = targetScreenForFallback()
-  if target then
-    if not beforeScreenFrame then return false end
+  local function moveFloatingFrameToTarget(target, meta)
+    if not target or not beforeScreenFrame then return false end
     local tf = effectiveScreenFrame(target)
 
     local offsetX = beforeFrame.x - beforeScreenFrame.x
@@ -280,12 +265,81 @@ local function moveAcrossDisplay(direction)
       win:focus()
     end
 
-    postMoveAdjustments({
+    postMoveAdjustments(meta or {
       targetDisplay = target:id(),
       fallbackUsed = false,
     })
     return true
   end
+
+  if not wasFloating and useYabai then
+    local ok, err, meta = _backend:moveWindowToDisplay(win:id(), displaySel, {
+      follow = displayPolicy.followDisplay == true,
+      wrap = allowWrap,
+    })
+    if ok then
+      postMoveAdjustments(meta)
+      return true
+    end
+
+    if strictFailure then
+      _alerts.warn(err or "Failed to move window to display")
+      return false
+    end
+
+    local shouldFloatFallback = shouldAutoFloat("displayMoveFailure")
+    if shouldFloatFallback and ensureFloating(win, "displayMoveFailure") then
+      local target = targetScreenForFallback()
+      if moveFloatingFrameToTarget(target, {
+        targetDisplay = target and target:id() or nil,
+        fallbackUsed = true,
+      }) then
+        info("window.displayMove", "smart failure fallback used", {
+          direction = direction,
+          error = err,
+          fallback = "auto-float-frame",
+        })
+        return true
+      end
+    end
+
+    warn("window.displayMove", "display move failed under smart failure mode", {
+      direction = direction,
+      error = err,
+      floating = wasFloating,
+      wrap = allowWrap,
+    })
+    return false
+  end
+
+  if not wasFloating then
+    local shouldFloatFallback = shouldAutoFloat("displayMoveFailure")
+    if shouldFloatFallback and ensureFloating(win, "displayMoveFailure") then
+      local target = targetScreenForFallback()
+      if moveFloatingFrameToTarget(target, {
+        targetDisplay = target and target:id() or nil,
+        fallbackUsed = true,
+      }) then
+        info("window.displayMove", "smart backend-unavailable fallback used", {
+          direction = direction,
+          fallback = "auto-float-frame",
+        })
+        return true
+      end
+    end
+
+    if strictFailure then
+      _alerts.warn("Display move backend unavailable for tiled window")
+    else
+      warn("window.displayMove", "display move backend unavailable for tiled window", {
+        direction = direction,
+      })
+    end
+    return false
+  end
+
+  local target = targetScreenForFallback()
+  if target and moveFloatingFrameToTarget(target) then return true end
 
   info("window.displayMove", "display move reached monitor edge", {
     direction = direction,
@@ -297,6 +351,9 @@ end
 local function applyNewWindowPolicy(win)
   if not win or not _policy then return end
   if not win:isStandard() then return end
+
+  local prior = hs.window.focusedWindow()
+  local priorId = prior and prior:id() or nil
 
   local app = win:application()
   local appName = app and app:name() or ""
@@ -325,6 +382,13 @@ local function applyNewWindowPolicy(win)
       source = rule.source,
       insertion = rule.insertion,
     })
+  end
+
+  if rule.focus == true then
+    win:focus()
+  elseif rule.focus == false and priorId and priorId ~= win:id() then
+    local prev = hs.window.get(priorId)
+    if prev then prev:focus() end
   end
 end
 

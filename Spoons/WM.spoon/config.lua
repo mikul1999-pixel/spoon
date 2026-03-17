@@ -35,25 +35,6 @@ M.ui = {
   },
 }
 
-M.behavior = {
-  balanceAfterDirectionalMove = false,
-  directionalFallback = true,
-  directionalPolicy = {
-    move = "smart",
-    focus = "smart",
-    swap = "smart",
-  },
-  autoFloatForGeometry = true,
-  autoFloatOnMoveFailure = false,
-  autoFloatOnDisplayMoveFailure = false,
-  preferYabaiDisplayMove = true,
-  followDisplayOnMove = true,
-  retryCount = 2,
-  placementHorizontalRatio = 0.5,
-  placementVerticalBandRatio = 0.5,
-  placementEdgeWarpPasses = 6,
-}
-
 M.policy = {
   defaults = {
     directional = {
@@ -73,12 +54,18 @@ M.policy = {
       wrap = true,
       failureMode = "strict",
       tiledBehavior = "retile",
-      floatingBehavior = "preserve_frame",
     },
     newWindow = {
       mode = "tile",
       insertion = "stack_end",
       focus = true,
+    },
+    backend = {
+      balanceAfterDirectionalMove = false,
+      retryCount = 2,
+      placementHorizontalRatio = 0.5,
+      placementVerticalBandRatio = 0.5,
+      placementEdgeWarpPasses = 6,
     },
   },
   appRules = {
@@ -130,11 +117,11 @@ M.layoutRuntime = {
   },
 }
 
-M.delays = {
-  appLaunch  = 1.0,
-  moveResize = 0.3,
-  vscode     = 1.0,
-}
+-- M.delays = {
+--   appLaunch  = 1.0,
+--   moveResize = 0.3,
+--   vscode     = 1.0,
+-- }
 
 -- single source of truth for all hotkeys
 -- action strings are handled in their modules

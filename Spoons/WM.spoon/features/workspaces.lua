@@ -82,7 +82,7 @@ end
 
 local function run(ok, err, fallback)
   if not ok then
-    _alerts.warn(err or fallback)
+    _alerts.warn(err or fallback or "Operation failed")
     return false
   end
   return true
@@ -220,10 +220,17 @@ function M:bind(cfg, commands, state, backend, logger, modes, policy)
     ["workspace.swap.right"] = function() swapDirectional("right") end,
     ["workspace.swap.up"] = function() swapDirectional("up") end,
     ["workspace.swap.down"] = function() swapDirectional("down") end,
-    ["workspace.toggleFloat"] = function() run(backend:toggleFloat(focusedWindowId()), "Toggle float failed") end,
-    ["workspace.toggleFullscreen"] = function() run(backend:toggleFullscreen(focusedWindowId()), "Toggle fullscreen failed") end,
+    ["workspace.toggleFloat"] = function()
+      local ok, err = backend:toggleFloat(focusedWindowId())
+      run(ok, err, "Toggle float failed")
+    end,
+    ["workspace.toggleFullscreen"] = function()
+      local ok, err = backend:toggleFullscreen(focusedWindowId())
+      run(ok, err, "Toggle fullscreen failed")
+    end,
     ["workspace.balance"] = function()
-      run(backend:balanceWorkspace(backend:focusedWorkspace()), "Balance failed")
+      local ok, err = backend:balanceWorkspace(backend:focusedWorkspace())
+      run(ok, err, "Balance failed")
     end,
     ["workspace.focus.prev"] = function()
       local current = backend:focusedWorkspace() or state:currentWorkspace() or 1

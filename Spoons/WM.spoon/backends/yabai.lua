@@ -176,12 +176,14 @@ function M:init(ctx)
   _shell = dofile(ctx.spoonPath .. "utils/shell.lua")
   _path = (ctx.config.yabai and ctx.config.yabai.path) or "/opt/homebrew/bin/yabai"
   _debug = ctx.config.workspaces and ctx.config.workspaces.debug or false
-  _retryCount = (ctx.config.behavior and ctx.config.behavior.retryCount) or 2
-  _placementHorizontalRatio = (ctx.config.behavior and ctx.config.behavior.placementHorizontalRatio) or 0.5
-  _placementVerticalBandRatio = (ctx.config.behavior and ctx.config.behavior.placementVerticalBandRatio) or 0.34
-  _placementEdgeWarpPasses = (ctx.config.behavior and ctx.config.behavior.placementEdgeWarpPasses) or 6
   _logger = ctx.logger
   _policy = ctx.policy
+
+  local backendPolicy = (_policy and _policy.backend and _policy:backend({ component = "backend.yabai" })) or {}
+  _retryCount = tonumber(backendPolicy.retryCount) or 2
+  _placementHorizontalRatio = tonumber(backendPolicy.placementHorizontalRatio) or 0.5
+  _placementVerticalBandRatio = tonumber(backendPolicy.placementVerticalBandRatio) or 0.5
+  _placementEdgeWarpPasses = tonumber(backendPolicy.placementEdgeWarpPasses) or 6
 
   local ui = ctx.config and ctx.config.ui and ctx.config.ui.statusbar or {}
   local reserve = ui.reserveTopPadding ~= false

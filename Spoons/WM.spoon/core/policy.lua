@@ -7,6 +7,7 @@ local _sources = {
   autoFloat = {},
   displayMove = {},
   newWindow = {},
+  backend = {},
 }
 local _logger = nil
 
@@ -53,12 +54,18 @@ local function defaults()
       wrap = true,
       failureMode = "strict",
       tiledBehavior = "retile",
-      floatingBehavior = "preserve_frame",
     },
     newWindow = {
       mode = "tile",
       insertion = "stack_end",
       focus = true,
+    },
+    backend = {
+      balanceAfterDirectionalMove = false,
+      retryCount = 2,
+      placementHorizontalRatio = 0.5,
+      placementVerticalBandRatio = 0.5,
+      placementEdgeWarpPasses = 6,
     },
     appRules = {},
   }
@@ -74,16 +81,24 @@ local function normalizeDisplayFailureMode(mode)
   return "strict"
 end
 
-local function normalizeFloatingBehavior(mode)
-  if mode == "preserve_relative_frame" or mode == "preserve_frame" then
-    return mode
-  end
-  return "preserve_frame"
-end
-
 local function normalizeTiledBehavior(mode)
   if mode == "retile" then return mode end
   return "retile"
+end
+
+local function normalizePositiveInt(value, fallback)
+  local n = tonumber(value)
+  if not n then return fallback end
+  n = math.floor(n)
+  if n < 1 then return fallback end
+  return n
+end
+
+local function normalizeRatio(value, fallback)
+  local n = tonumber(value)
+  if not n then return fallback end
+  if n <= 0 or n >= 1 then return fallback end
+  return n
 end
 
 local function emit(level, event, message, data)
@@ -100,72 +115,55 @@ end
 function M:configure(cfg, logger)
   _logger = logger
 
-  local behavior = (cfg and cfg.behavior) or {}
   local custom = (cfg and cfg.policy) or {}
   local customDefaults = custom.defaults or {}
 
-  local legacy = {
-    directional = {
-      move = normalizeMode(behavior.directionalPolicy and behavior.directionalPolicy.move),
-      focus = normalizeMode(behavior.directionalPolicy and behavior.directionalPolicy.focus),
-      swap = normalizeMode(behavior.directionalPolicy and behavior.directionalPolicy.swap),
-    },
-    autoFloat = {
-      geometry = behavior.autoFloatForGeometry,
-      moveFailure = behavior.autoFloatOnMoveFailure,
-      displayMoveFailure = behavior.autoFloatOnDisplayMoveFailure,
-      swapFailure = behavior.autoFloatOnMoveFailure,
-    },
-    displayMove = {
-      preferYabai = behavior.preferYabaiDisplayMove,
-      followDisplay = behavior.followDisplayOnMove,
-    },
-  }
-
-  _policy = merge(defaults(), legacy)
-  _policy = merge(_policy, customDefaults)
+  _policy = merge(defaults(), customDefaults)
   if custom.appRules ~= nil then
     _policy.appRules = custom.appRules
   end
 
   _sources = {
     directional = {
-      move = sourceFrom(customDefaults.directional and customDefaults.directional.move, legacy.directional.move),
-      focus = sourceFrom(customDefaults.directional and customDefaults.directional.focus, legacy.directional.focus),
-      swap = sourceFrom(customDefaults.directional and customDefaults.directional.swap, legacy.directional.swap),
+      move = sourceFrom(customDefaults.directional and customDefaults.directional.move, nil),
+      focus = sourceFrom(customDefaults.directional and customDefaults.directional.focus, nil),
+      swap = sourceFrom(customDefaults.directional and customDefaults.directional.swap, nil),
     },
     autoFloat = {
-      geometry = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.geometry, legacy.autoFloat.geometry),
-      moveFailure = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.moveFailure, legacy.autoFloat.moveFailure),
-      displayMoveFailure = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.displayMoveFailure, legacy.autoFloat.displayMoveFailure),
-      swapFailure = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.swapFailure, legacy.autoFloat.swapFailure),
+      geometry = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.geometry, nil),
+      moveFailure = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.moveFailure, nil),
+      displayMoveFailure = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.displayMoveFailure, nil),
+      swapFailure = sourceFrom(customDefaults.autoFloat and customDefaults.autoFloat.swapFailure, nil),
     },
     displayMove = {
-      preferYabai = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.preferYabai, legacy.displayMove.preferYabai),
-      followDisplay = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.followDisplay, legacy.displayMove.followDisplay),
+      preferYabai = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.preferYabai, nil),
+      followDisplay = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.followDisplay, nil),
       wrap = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.wrap, nil),
       failureMode = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.failureMode, nil),
       tiledBehavior = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.tiledBehavior, nil),
-      floatingBehavior = sourceFrom(customDefaults.displayMove and customDefaults.displayMove.floatingBehavior, nil),
     },
     newWindow = {
       mode = sourceFrom(customDefaults.newWindow and customDefaults.newWindow.mode, nil),
       insertion = sourceFrom(customDefaults.newWindow and customDefaults.newWindow.insertion, nil),
       focus = sourceFrom(customDefaults.newWindow and customDefaults.newWindow.focus, nil),
     },
+    backend = {
+      balanceAfterDirectionalMove = sourceFrom(customDefaults.backend and customDefaults.backend.balanceAfterDirectionalMove, nil),
+      retryCount = sourceFrom(customDefaults.backend and customDefaults.backend.retryCount, nil),
+      placementHorizontalRatio = sourceFrom(customDefaults.backend and customDefaults.backend.placementHorizontalRatio, nil),
+      placementVerticalBandRatio = sourceFrom(customDefaults.backend and customDefaults.backend.placementVerticalBandRatio, nil),
+      placementEdgeWarpPasses = sourceFrom(customDefaults.backend and customDefaults.backend.placementEdgeWarpPasses, nil),
+    },
   }
 
   if not normalizeMode(_policy.directional.move) then
-    _policy.directional.move = (behavior.directionalFallback == false) and "strict" or "smart"
-    _sources.directional.move = "legacyFallback"
+    _policy.directional.move = "smart"
   end
   if not normalizeMode(_policy.directional.focus) then
-    _policy.directional.focus = (behavior.directionalFallback == false) and "strict" or "smart"
-    _sources.directional.focus = "legacyFallback"
+    _policy.directional.focus = "smart"
   end
   if not normalizeMode(_policy.directional.swap) then
-    _policy.directional.swap = (behavior.directionalFallback == false) and "strict" or "smart"
-    _sources.directional.swap = "legacyFallback"
+    _policy.directional.swap = "smart"
   end
 
   if _policy.newWindow.mode ~= "float" then
@@ -180,8 +178,15 @@ function M:configure(cfg, logger)
 
   _policy.displayMove.failureMode = normalizeDisplayFailureMode(_policy.displayMove.failureMode)
   _policy.displayMove.tiledBehavior = normalizeTiledBehavior(_policy.displayMove.tiledBehavior)
-  _policy.displayMove.floatingBehavior = normalizeFloatingBehavior(_policy.displayMove.floatingBehavior)
   if _policy.displayMove.wrap == nil then _policy.displayMove.wrap = true end
+
+  local backend = _policy.backend or {}
+  backend.balanceAfterDirectionalMove = backend.balanceAfterDirectionalMove == true
+  backend.retryCount = normalizePositiveInt(backend.retryCount, 2)
+  backend.placementHorizontalRatio = normalizeRatio(backend.placementHorizontalRatio, 0.5)
+  backend.placementVerticalBandRatio = normalizeRatio(backend.placementVerticalBandRatio, 0.5)
+  backend.placementEdgeWarpPasses = normalizePositiveInt(backend.placementEdgeWarpPasses, 6)
+  _policy.backend = backend
 
   if type(_policy.appRules) ~= "table" then
     _policy.appRules = {}
@@ -215,7 +220,6 @@ function M:displayMove(context)
     wrap = value.wrap,
     failureMode = value.failureMode,
     tiledBehavior = value.tiledBehavior,
-    floatingBehavior = value.floatingBehavior,
     source = _sources.displayMove,
     context = context,
   })
@@ -235,6 +239,16 @@ end
 
 function M:newWindowDefaults()
   return clone(_policy.newWindow or {})
+end
+
+function M:backend(context)
+  local value = clone(_policy.backend or {})
+  emit("trace", "policy.backend", "resolved backend policy", {
+    backend = value,
+    source = _sources.backend,
+    context = context,
+  })
+  return value
 end
 
 function M:newWindowRule(appName)
