@@ -33,7 +33,7 @@ Config: `Spoons/WM.spoon/config.lua`
 | `hyper+space` | Toggle float |
 | `hyper+N/P` | Move window next/prev monitor |
 | `hyper+tab` | Focus next screen |
-| `hyper+\` | Cycle local stack (on same screen) |
+| ``hyper+` `` | Cycle local stack (on same screen) |
 | `hyper+1..9` | Focus workspace |
 | `hyper+R` | Resize mode |
 | `hyper+A` | Focus mode |
@@ -52,5 +52,5 @@ Config: `Spoons/WM.spoon/config.lua`
   - intelligent fallbacks (directional intent + looping, switching between Hammerspoon-native and yabai paths)
   - command handling
   - consistent feedback (UI + logging)
-  
+
 This split lets me combine Hammerspoon and yabai to mirror Linux-like WM behavior, while keeping the logic scriptable in Lua.

@@ -204,7 +204,7 @@ local function renderToast()
       text = msg,
       textFont = "Menlo",
       textSize = 11,
-      textColor = TOAST_STYLE.text,
+      textColor = palette.text,
       textAlignment = "center",
       frame = { x = padX, y = padY + 1, w = w - padX * 2, h = h - padY * 2 },
     },
