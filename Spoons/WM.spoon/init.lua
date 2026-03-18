@@ -102,6 +102,7 @@ function WM:start()
       config = cfg,
       state = self.state,
       logger = self.logger,
+      backend = self.backend,
     })
   end
 
