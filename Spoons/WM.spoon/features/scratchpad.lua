@@ -55,7 +55,9 @@ local function removeById(winId)
     if s.id == winId then
       if s.watcher then s.watcher:stop() end
       table.remove(_scratchpads, i)
-      _state:removeScratchOrigin(winId)
+      if _state and _state.removeScratchOrigin then
+        _state:removeScratchOrigin(winId)
+      end
       local idx = getLastIndex()
       if idx >= i then setLastIndex(math.max(0, idx - 1)) end
       return
@@ -258,6 +260,16 @@ function M:bind(cfg, commands, state, backend, logger)
       end)
     end
   end
+end
+
+function M:stop()
+  for _, entry in ipairs(_scratchpads) do
+    if entry.watcher then
+      entry.watcher:stop()
+      entry.watcher = nil
+    end
+  end
+  _scratchpads = {}
 end
 
 return M

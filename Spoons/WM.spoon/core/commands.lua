@@ -46,7 +46,7 @@ function M:execute(name, args)
     })
   end
 
-  local ok, result = pcall(cmd.run, args)
+  local ok, result, extraErr = pcall(cmd.run, args)
   if not ok then
     if _state and _state.recordResult then
       _state:recordResult({
@@ -65,6 +65,9 @@ function M:execute(name, args)
   local fallbackUsed = false
   if type(result) == "boolean" then
     runOk = result
+    if runOk == false and extraErr ~= nil then
+      err = tostring(extraErr)
+    end
   elseif type(result) == "table" then
     if result.ok ~= nil then runOk = result.ok == true end
     err = result.error

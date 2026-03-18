@@ -45,13 +45,20 @@ function WM:start()
   self.modes:setState(self.state)
   self.modes:reset()
   self.policy:configure(cfg, self.logger)
-  self.backend:init({
+  local backendOk = self.backend:init({
     spoonPath = self.spoonPath,
     config = cfg,
     state = self.state,
     logger = self.logger,
     policy = self.policy,
   })
+  if not backendOk then
+    self.logger:error("wm.start", "backend initialization failed", {
+      backend = cfg.workspaces and cfg.workspaces.backend,
+    })
+    hs.alert.show("WM failed: backend init")
+    return false
+  end
 
   self.commands:register("wm.backendHealth", function()
     print(hs.inspect(self.backend:health()))
@@ -102,10 +109,13 @@ function WM:start()
 
   self.logger:info("wm.start", "WM started", { backend = self.backend:name() })
   hs.alert.show("WM loaded")
+  return true
 end
 
 function WM:stop()
+  if self.window and self.window.stop then self.window:stop() end
   if self.layouts and self.layouts.stop then self.layouts:stop() end
+  if self.scratchpad and self.scratchpad.stop then self.scratchpad:stop() end
   if self.help and self.help.stop then self.help:stop() end
   if self.statusbar and self.statusbar.stop then self.statusbar:stop() end
   if self._watcher then self._watcher:stop() end

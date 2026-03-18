@@ -11,6 +11,26 @@ function M:init(p)
   _alerts = dofile(_spoonPath .. "ui/alerts.lua")
 end
 
+local function appWindowsInOrder(appName, app)
+  local ordered = {}
+  for _, win in ipairs(hs.window.orderedWindows() or {}) do
+    local winApp = win:application()
+    if winApp and winApp:name() == appName and not win:isMinimized() and win:isVisible() then
+      table.insert(ordered, win)
+    end
+  end
+
+  if #ordered > 0 then return ordered end
+
+  local fallback = {}
+  for _, win in ipairs(app:allWindows() or {}) do
+    if not win:isMinimized() then
+      table.insert(fallback, win)
+    end
+  end
+  return fallback
+end
+
 local function toggleOrCycle(appName)
   local app = hs.application.get(appName)
   if not app then
@@ -18,16 +38,29 @@ local function toggleOrCycle(appName)
     return
   end
 
-  local windows = app:allWindows()
+  local windows = appWindowsInOrder(appName, app)
   if #windows == 0 then
     hs.application.launchOrFocus(appName)
     return
   end
 
   local focused = hs.window.focusedWindow()
-  if focused and focused:application():name() == appName then
-    if #windows > 1 then windows[2]:focus()
-    else app:hide() end
+  local focusedApp = focused and focused:application()
+  if focusedApp and focusedApp:name() == appName then
+    if #windows == 1 then
+      app:hide()
+      return
+    end
+
+    local nextIndex = 1
+    local focusedId = focused:id()
+    for i, win in ipairs(windows) do
+      if win:id() == focusedId then
+        nextIndex = (i % #windows) + 1
+        break
+      end
+    end
+    windows[nextIndex]:focus()
   else
     windows[1]:focus()
   end

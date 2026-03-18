@@ -698,4 +698,20 @@ function M:bind(cfg, commands, backend, logger, modes, policy)
   end
 end
 
+function M:stop()
+  if _newWindowFilter then
+    _newWindowFilter:unsubscribeAll()
+    _newWindowFilter = nil
+  end
+
+  if _focusTracker then
+    _focusTracker:unsubscribeAll()
+    _focusTracker = nil
+  end
+
+  _screenCycleMru = {}
+  _undoFrames = {}
+  _suppressCycleFocusTracking = false
+end
+
 return M
