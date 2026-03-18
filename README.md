@@ -47,10 +47,9 @@ Config: `Spoons/WM.spoon/config.lua`
 
 ### Behavior Notes
 
-- Hammerspoon is the policy/control layer (modes, intent, fallback logic, and UI), while yabai is the execution backend for tiled operations.
-- Some actions are handled entirely in Hammerspoon, but its main role is orchestration: deciding what should happen and recovering when backend actions fail.
-  - intelligent fallbacks (directional intent + looping, switching between Hammerspoon-native and yabai paths)
-  - command handling
-  - consistent feedback (UI + logging)
-
-This split lets me combine Hammerspoon and yabai to mirror Linux-like WM behavior, while keeping the logic scriptable in Lua.
+- Hammerspoon acts as the control/policy layer (modes, intent, fallbacks, UI/logging), and yabai is the execution backend for tiled window ops.
+- A few actions stay fully in Hammerspoon, but its main role is orchestration: decide what should happen, call the right path, and recover gracefully if backend actions fail.
+  - directional fallback logic
+  - switching between Hammerspoon-native and yabai paths
+  - command routing + consistent feedback
+This split gives me Linux-like WM behavior on macOS while keeping the core logic scriptable in Lua.
