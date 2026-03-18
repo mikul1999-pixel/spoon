@@ -52,4 +52,5 @@ Config: `Spoons/WM.spoon/config.lua`
   - directional fallback logic
   - switching between Hammerspoon-native and yabai paths
   - command routing + consistent feedback
+  
 This split gives me Linux-like WM behavior on macOS while keeping the core logic scriptable in Lua.
