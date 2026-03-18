@@ -20,16 +20,68 @@ end
 
 function WM:init()
   self.config     = req("config")
-  self.utils      = req("utils")
-  self.apps       = req("apps")
-  self.window     = req("window")
-  self.layouts    = req("layouts")
-  self.scratchpad = req("scratchpad")
-  self.help       = req("help")
+  self.logger     = req("core/logger")
+  self.commands   = req("core/commands")
+  self.state      = req("core/state")
+  self.modes      = req("core/modes")
+  self.policy     = req("core/policy")
+  self.backend    = req("core/backend")
+  self.apps       = req("features/apps")
+  self.window     = req("features/window")
+  self.workspaces = req("features/workspaces")
+  self.layouts    = req("features/layouts")
+  self.scratchpad = req("features/scratchpad")
+  self.help       = req("ui/help")
+  self.statusbar  = req("ui/statusbar")
 end
 
 function WM:start()
   local cfg = self.config
+  self.logger:configure(cfg)
+
+  self.commands:reset()
+  self.commands:setState(self.state)
+  self.state:reset()
+  self.modes:setState(self.state)
+  self.modes:reset()
+  self.policy:configure(cfg, self.logger)
+  local backendOk = self.backend:init({
+    spoonPath = self.spoonPath,
+    config = cfg,
+    state = self.state,
+    logger = self.logger,
+    policy = self.policy,
+  })
+  if not backendOk then
+    self.logger:error("wm.start", "backend initialization failed", {
+      backend = cfg.workspaces and cfg.workspaces.backend,
+    })
+    hs.alert.show("WM failed: backend init")
+    return false
+  end
+
+  self.commands:register("wm.backendHealth", function()
+    print(hs.inspect(self.backend:health()))
+  end, { category = "wm" })
+
+  self.commands:register("wm.debugToggle", function()
+    local enabled = self.logger:toggleDebug()
+    hs.alert.show("WM debug " .. (enabled and "on" or "off"))
+  end, { category = "wm" })
+
+  self.commands:register("wm.debugLast", function(args)
+    local n = args and args.count or 25
+    print(hs.inspect(self.logger:last(n)))
+  end, { category = "wm" })
+
+  self.commands:register("wm.stateDump", function()
+    print(self.state:dump())
+  end, { category = "wm" })
+
+  self.commands:register("ui.statusbar.toggle", function()
+    local visible = self.statusbar:toggle()
+    hs.alert.show("Status bar " .. (visible and "shown" or "hidden"))
+  end, { category = "ui" })
 
   -- auto reload on .lua changes
   self._watcher = hs.pathwatcher.new(hs.configdir .. "/", function(files)
@@ -39,16 +91,34 @@ function WM:start()
   end)
   self._watcher:start()
 
-  self.apps:bind(cfg)
-  self.window:bind(cfg)
-  self.layouts:bind(cfg)
-  self.scratchpad:bind(cfg)
-  self.help:bind(cfg)
+  self.apps:bind(cfg, self.commands)
+  self.window:bind(cfg, self.commands, self.backend, self.logger, self.modes, self.policy)
+  self.workspaces:bind(cfg, self.commands, self.state, self.backend, self.logger, self.modes, self.policy)
+  self.layouts:bind(cfg, self.commands, self.backend, self.logger)
+  self.scratchpad:bind(cfg, self.commands, self.state, self.backend, self.logger)
+  self.help:bind(cfg, self.commands)
+  if not cfg.ui or not cfg.ui.statusbar or cfg.ui.statusbar.enabled ~= false then
+    self.statusbar:start({
+      config = cfg,
+      state = self.state,
+      logger = self.logger,
+      backend = self.backend,
+    })
+  end
 
+  dofile(self.spoonPath .. "ui/alerts.lua"):setStatusbar(self.statusbar, cfg)
+
+  self.logger:info("wm.start", "WM started", { backend = self.backend:name() })
   hs.alert.show("WM loaded")
+  return true
 end
 
 function WM:stop()
+  if self.window and self.window.stop then self.window:stop() end
+  if self.layouts and self.layouts.stop then self.layouts:stop() end
+  if self.scratchpad and self.scratchpad.stop then self.scratchpad:stop() end
+  if self.help and self.help.stop then self.help:stop() end
+  if self.statusbar and self.statusbar.stop then self.statusbar:stop() end
   if self._watcher then self._watcher:stop() end
   hs.hotkey.deleteAll()
 end
